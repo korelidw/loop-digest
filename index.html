@@ -1,0 +1,59 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Loop Digest Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+ body{font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin:20px;}
+ h1{font-size:20px;margin:0 0 8px}
+ .row{display:flex;gap:16px;flex-wrap:wrap}
+ .card{border:1px solid #ddd;border-radius:8px;padding:12px;flex:1;min-width:280px}
+ table{border-collapse:collapse;width:100%;font-size:12px}
+ th,td{border-bottom:1px solid #eee;padding:6px 8px;text-align:left}
+ small{color:#666}
+ canvas{max-width:100%;height:220px}
+</style>
+</head>
+<body>
+<h1>Loop Digest Dashboard</h1>
+<small>Local snapshot; refresh after reruns. Time zone: America/Chicago</small>
+<div class="row">
+ <div class="card"><h3>TIR/TBR/TAR</h3><canvas id="tir"></canvas><div>CV: 38% · GRI: 13.69 (L 2.14 / H 11.55 ) · Coverage: 100%</div></div>
+ <div class="card"><h3>Daily Risk & Reliability</h3><canvas id="overlay"></canvas></div>
+</div>
+<div class="row">
+ <div class="card"><h3>Top Hypotheses</h3>
+  <table><thead><tr><th>Title</th><th>Lever</th><th>Dir</th><th>Confidence</th></tr></thead><tbody id="cards"><tr><td>Overnight downward drift suggests basal too strong</td><td>basal</td><td>too strong</td><td>Medium</td></tr><tr><td>Post-breakfast highs suggest ICR too weak</td><td>ICR</td><td>too weak</td><td>Medium</td></tr><tr><td>Post-lunch highs suggest ICR too weak</td><td>ICR</td><td>too weak</td><td>Medium</td></tr><tr><td>Post-dinner highs suggest ICR too weak</td><td>ICR</td><td>too weak</td><td>Medium</td></tr><tr><td>Corrections often ineffective → ISF may be too weak</td><td>ISF</td><td>too weak</td><td>Medium</td></tr></tbody></table>
+ </div>
+ <div class="card"><h3>School Meals (timing bands)</h3>
+  <table><thead><tr><th>Window</th><th>Lead bin</th><th>n</th><th>%>180</th><th>Median peak</th></tr></thead><tbody id="school"><tr><td>Breakfast 7:00–8:00</td><td>pre10-19</td><td>1</td><td>100%</td><td>227</td></tr><tr><td>Breakfast 7:00–8:00</td><td>pre&gt;=20</td><td>4</td><td>100%</td><td>227</td></tr><tr><td>Breakfast 7:00–8:00</td><td>post0-9</td><td>1</td><td>100%</td><td>231</td></tr><tr><td>Breakfast 7:00–8:00</td><td>pre0-4</td><td>1</td><td>100%</td><td>231</td></tr><tr><td>Lunch 11:20–12:10</td><td>pre&gt;=20</td><td>1</td><td>100%</td><td>189</td></tr></tbody></table>
+ </div>
+</div>
+<script>
+ const metrics = {"meta":{"durationDays":14,"coverage":1,"count":8669},"tir":{"veryLow":7,"low":88,"inRange":5121,"high":3460,"veryHigh":1187},"cv":38,"risk":{"LBGI":2.14,"HBGI":11.55,"GRI":13.69},"dataFlags":{"possibleMissedCarbs":139}};
+ const review = {"meta":{"tz":"America/Chicago","totalReadings":8669,"coverage":1,"durationDays":14,"tir":{"low":88,"inRange":5121,"high":3460,"veryLow":7,"veryHigh":1187}},"meals":{"breakfast":{"n":19,"pctHigh":84.2,"medianPeak":231,"medianTimeTo180Min":2.7917870666503903},"lunch":{"n":11,"pctHigh":90.9,"medianPeak":292,"medianTimeTo180Min":2.269292761230469},"dinner":{"n":38,"pctHigh":100,"medianPeak":248.5,"medianTimeTo180Min":4.0889},"other":{"n":12,"pctHigh":100,"medianPeak":263,"medianTimeTo180Min":33.9152}},"corrections":{"n":1181,"pctIneffective":58,"pctOvershoot":10.1,"medianDrop":20},"nights":{"n":14,"medianSlope":-15.956964160244848,"nightsLowCount":0,"nightsHighCount":8},"cards":[{"title":"Overnight downward drift suggests basal too strong","window":"00:00–04:00 local, fasting","levers":["basal"],"direction":"too strong","evidence":["Median overnight slope -16.0 mg/dL/hr (negative)","0 nights with <70","8 nights >180 (context)"],"confidence":"Medium","confounders":["late corrections","exercise carryover","sensor compression lows"],"safety":"If basal reduced incorrectly, overnight highs may increase.","next":["Confirm with a 4–6h fasting window near midnight on a quiet night; watch trend without Loop corrections."]},{"title":"Post-breakfast highs suggest ICR too weak","window":"breakfast meals","levers":["ICR"],"direction":"too weak","evidence":["19 breakfast meals analyzed","84.2% peaked >180","Median peak ~231 mg/dL","Median return-to-180 3 min"],"confidence":"Medium","confounders":["unannounced carbs","fat/protein delays","site absorption"],"safety":"Over-tightening ICR risks post-meal lows.","next":["Log a few breakfast meals with accurate carbs; watch 4h curve and correction needs."]},{"title":"Post-lunch highs suggest ICR too weak","window":"lunch meals","levers":["ICR"],"direction":"too weak","evidence":["11 lunch meals analyzed","90.9% peaked >180","Median peak ~292 mg/dL","Median return-to-180 2 min"],"confidence":"Medium","confounders":["unannounced carbs","fat/protein delays","site absorption"],"safety":"Over-tightening ICR risks post-meal lows.","next":["Log a few lunch meals with accurate carbs; watch 4h curve and correction needs."]},{"title":"Post-dinner highs suggest ICR too weak","window":"dinner meals","levers":["ICR"],"direction":"too weak","evidence":["38 dinner meals analyzed","100% peaked >180","Median peak ~248.5 mg/dL","Median return-to-180 4 min"],"confidence":"Medium","confounders":["unannounced carbs","fat/protein delays","site absorption"],"safety":"Over-tightening ICR risks post-meal lows.","next":["Log a few dinner meals with accurate carbs; watch 4h curve and correction needs."]},{"title":"Corrections often ineffective → ISF may be too weak","window":"Anytime corrections (no carbs)","levers":["ISF"],"direction":"too weak","evidence":["1181 corrections analyzed","58% had <30 mg/dL drop within 2h","Median 2h drop 20 mg/dL"],"confidence":"Medium","confounders":["insulin on board","rising meals misclassified","site issues"],"safety":"Strengthening ISF increases hypoglycemia risk if misapplied.","next":["Tag a few clean corrections (no food/exercise) and re-check 2–3h impact."]}]};
+ const overlay = {"tz":"America/Chicago","suspendThreshold":74,"days":[{"day":"2026-01-26","cycles":72,"pctPredLeSuspend":23.6,"pctZeroBasal":45.8,"pctABcycles":30.6,"pctFailures":8.3},{"day":"2026-01-27","cycles":292,"pctPredLeSuspend":22.6,"pctZeroBasal":43.8,"pctABcycles":28.4,"pctFailures":10.3},{"day":"2026-01-28","cycles":290,"pctPredLeSuspend":12.4,"pctZeroBasal":45.9,"pctABcycles":30,"pctFailures":11},{"day":"2026-01-29","cycles":310,"pctPredLeSuspend":16.8,"pctZeroBasal":41.9,"pctABcycles":28.4,"pctFailures":13.2},{"day":"2026-01-30","cycles":296,"pctPredLeSuspend":11.5,"pctZeroBasal":41.9,"pctABcycles":27.7,"pctFailures":13.2},{"day":"2026-01-31","cycles":318,"pctPredLeSuspend":17.3,"pctZeroBasal":34.9,"pctABcycles":22,"pctFailures":13.5},{"day":"2026-02-01","cycles":295,"pctPredLeSuspend":23.1,"pctZeroBasal":46.1,"pctABcycles":26.4,"pctFailures":7.1},{"day":"2026-02-02","cycles":271,"pctPredLeSuspend":25.1,"pctZeroBasal":51.7,"pctABcycles":32.1,"pctFailures":0.7},{"day":"2026-02-03","cycles":289,"pctPredLeSuspend":12.1,"pctZeroBasal":56.1,"pctABcycles":36.7,"pctFailures":0},{"day":"2026-02-04","cycles":296,"pctPredLeSuspend":2.7,"pctZeroBasal":42.2,"pctABcycles":27,"pctFailures":5.1},{"day":"2026-02-05","cycles":306,"pctPredLeSuspend":12.1,"pctZeroBasal":32.4,"pctABcycles":20.9,"pctFailures":13.1},{"day":"2026-02-06","cycles":338,"pctPredLeSuspend":11.5,"pctZeroBasal":39.9,"pctABcycles":24.3,"pctFailures":16},{"day":"2026-02-07","cycles":284,"pctPredLeSuspend":18,"pctZeroBasal":38.7,"pctABcycles":25,"pctFailures":13},{"day":"2026-02-08","cycles":293,"pctPredLeSuspend":19.8,"pctZeroBasal":39.6,"pctABcycles":24.9,"pctFailures":9.9},{"day":"2026-02-09","cycles":306,"pctPredLeSuspend":17,"pctZeroBasal":42.5,"pctABcycles":30.1,"pctFailures":16.7}]};
+ // TIR doughnut
+ const tir = (review.meta && review.meta.tir) || metrics.tir || {};
+ if(window.Chart){
+  new Chart(document.getElementById('tir').getContext('2d'),{
+    type:'doughnut', data:{
+      labels:['<54','<70','70-180','>180','>250'],
+      datasets:[{data:[tir.veryLow||0, (tir.low||0)-(tir.veryLow||0), tir.inRange||0, (tir.high||0)-(tir.veryHigh||0), tir.veryHigh||0], backgroundColor:['#8e44ad','#3498db','#2ecc71','#e67e22','#e74c3c']}]
+    }, options:{plugins:{legend:{position:'bottom'}}, cutout:'60%'}
+  });
+  // Overlay lines
+  const days = (overlay.days||[]).map(d=>d.day);
+  const predL = (overlay.days||[]).map(d=>d.pctPredLeSuspend);
+  const fails = (overlay.days||[]).map(d=>d.pctFailures);
+  new Chart(document.getElementById('overlay').getContext('2d'),{
+    type:'line', data:{labels:days, datasets:[
+      {label:'Pred ≤ suspend %', data:predL, borderColor:'#e67e22', tension:0.2},
+      {label:'Pump comm errors %', data:fails, borderColor:'#e74c3c', tension:0.2}
+    ]}, options:{responsive:true, plugins:{legend:{position:'bottom'}}, scales:{y:{min:0,max:60,ticks:{stepSize:10}}}}
+  });
+ }
+</script>
+</body></html>
