@@ -18,7 +18,7 @@
 </head>
 <body>
 <h1>Loop Digest Dashboard</h1>
-<small>Local snapshot; refresh after reruns. Time zone: America/Chicago</small>
+<small>Time zone: America/Chicago · Last progress update: 2026-02-10T22:05:00-06:00</small>
 <div class="row">
  <div class="card"><h3>TIR/TBR/TAR</h3><canvas id="tir"></canvas><div>CV: 38% · GRI: 13.69 (L 2.14 / H 11.55 ) · Coverage: 100%</div></div>
  <div class="card"><h3>Daily Risk & Reliability</h3><canvas id="overlay"></canvas></div>
@@ -29,6 +29,11 @@
  </div>
  <div class="card"><h3>School Meals (timing bands)</h3>
   <table><thead><tr><th>Window</th><th>Lead bin</th><th>n</th><th>%>180</th><th>Median peak</th></tr></thead><tbody id="school"><tr><td>Breakfast 7:00–8:00</td><td>pre10-19</td><td>1</td><td>100%</td><td>227</td></tr><tr><td>Breakfast 7:00–8:00</td><td>pre&gt;=20</td><td>4</td><td>100%</td><td>227</td></tr><tr><td>Breakfast 7:00–8:00</td><td>post0-9</td><td>1</td><td>100%</td><td>231</td></tr><tr><td>Breakfast 7:00–8:00</td><td>pre0-4</td><td>1</td><td>100%</td><td>231</td></tr><tr><td>Lunch 11:20–12:10</td><td>pre&gt;=20</td><td>1</td><td>100%</td><td>189</td></tr></tbody></table>
+ </div>
+</div>
+<div class="row">
+ <div class="card"><h3>Progress</h3>
+  <ul><li>Set up weekly safety digest (Sun 7pm CT) and nightly mini-alerts (9pm CT).</li><li>Computed 14-day digest (TIR/TBR/TAR, CV, GRI, coverage).</li><li>Ran Loop constraints/gating pass (suspend threshold, AB cadence, max caps, comm errors).</li><li>Built overlay of daily predicted-lows, zero-basal %, AB %, and comm errors.</li><li>Meal timing analysis (incl. school breakfast/lunch windows).</li><li>Correction effectiveness by IOB and time-of-day (clean vs likely meal-related).</li><li>Published live dashboard (GitHub Pages).</li><li>Phase 2.5 what-if modeling in progress: clean-correction ISF sweeps; school lunch timing shifts; dinner timing vs composition.</li><li>ETA: first scenario cards within 48 hours (by 2026-02-12).</li></ul>
  </div>
 </div>
 <script>
