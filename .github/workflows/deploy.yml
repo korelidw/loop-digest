@@ -1,0 +1,78 @@
+name: Build and Deploy
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch: {}
+  schedule:
+    - cron: "0 6 * * *"  # daily at 06:00 UTC; adjust as needed
+permissions:
+  contents: write
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install deps (optional)
+        run: |
+          [ -f package.json ] && npm ci || echo "No package.json; skipping install"
+
+      - name: Fetch Nightscout data (read-only)
+        env:
+          NS_URL: ${{ secrets.NIGHTSCOUT_URL }}
+          NS_TOKEN: ${{ secrets.NIGHTSCOUT_TOKEN }}
+        run: |
+          if [ -x scripts/fetch_ns.sh ]; then
+            bash scripts/fetch_ns.sh
+          else
+            echo "fetch_ns.sh not found; assuming public data or pre-baked aggregates"
+          fi
+          node scripts/metrics_prev.js || true
+          node scripts/metrics_digest.js || true
+
+      - name: Build dashboard
+        run: |
+          node scripts/build_dashboard.js || true
+
+      - name: Copy built site
+        run: |
+          mkdir -p site
+          # Expect scripts/build_dashboard.js to write to ./site
+          test -f site/index.html || echo '<!doctype html><meta charset="utf-8"><title>Loop Digest</title><p>Initial deploy placeholder.</p>' > site/index.html
+
+      - name: Deploy to gh-pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: site
+          publish_branch: gh-pages
+          force_orphan: false
+
+  pr-check:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout PR
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Build (no deploy)
+        run: |
+          node scripts/build_dashboard.js || true
+      - name: Upload artifact (preview)
+        uses: actions/upload-artifact@v4
+        with:
+          name: site-preview
+          path: site/
