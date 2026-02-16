@@ -1,0 +1,10 @@
+# Local data and secrets
+/data/
+**/data/
+.env*
+*.token
+*.secret
+# Caches and system files
+.DS_Store
+*.log
+node_modules/
