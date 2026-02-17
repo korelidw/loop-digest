@@ -510,6 +510,50 @@ const scenarioSectionHtml = `<div class="scenario-shell">
   <div class="scenario-legend">Legend: Chips show Pred ≤ suspend (green <10%, amber 10–25%, red ≥25%), AB cadence (<15%, 15–30%, >30%), and Max basal hits (0%, 0–5%, ≥5%). Risk chips align with the same color scale.</div>
 </div>`;
 
+// Collapsed hypotheses at top
+const hypothesesTableHtml = `<table><thead><tr><th>Title</th><th>Lever</th><th>Dir</th><th>Confidence</th></tr></thead><tbody>${cardsRows}</tbody></table>`;
+const hypothesesCollapsedHtml = `<details><summary><strong>Hypotheses</strong> (collapsed)</summary>${hypothesesTableHtml}</details>`;
+
+// Experiments v1 section (from data/experiments.json)
+const experiments = load(path.join(dataDir,'experiments.json'))||{};
+function listFrom(arr){ if(!Array.isArray(arr)||!arr.length) return '<div class="muted">None</div>'; return '<ul>'+arr.map(x=>`<li><strong>${esc(x.title||'')}</strong> — ${esc(x.window||'')}<br><small>Goal: ${esc(x.goal||'')} · Metric: ${esc(x.metric||'')} · Owner: ${esc(x.owner||'')} · Status: ${esc(x.status||'')}</small><br><small>${esc(x.notes||'')}</small></li>`).join('')+'</ul>'; }
+const experimentsHtml = `<div class="card"><h3>Experiments v1</h3><div><small>Last update: ${esc(experiments.updatedAt||'n/a')}</small></div>${listFrom(experiments.active)}<details><summary>Past</summary>${listFrom(experiments.past)}</details></div>`;
+
+// Dinner Lens (simple summary)
+function dinnerSummaryHtml(){
+  const m = (review&&review.meals)||{}; const d=m.dinner||null; if(!d||!d.n) return '<div class="muted">Not enough dinners for reliable patterns.</div>';
+  const pct = Math.round(d.pctHigh||0); const pk = d.medianPeak!=null? Math.round(d.medianPeak): null; const t180 = d.medianTimeTo180Min!=null? Math.round(d.medianTimeTo180Min)+'m' : (d.pctHigh>0? '>4h':'≤180');
+  return `<ul><li>Dinner %>180: ${pct}%</li>${pk!=null? `<li>Median peak: ${pk}</li>`:''}<li>T→180 (med): ${t180}</li></ul>`;
+}
+const dinnerLensHtml = `<div class="card"><h3>Dinner Lens</h3>${dinnerSummaryHtml()}<div class="muted">Directional only if n is small; use with School Meal Lens for daytime context.</div></div>`;
+
+// Corrections @120m · ISF Bias table
+function isfAtHour(h){
+  try{
+    const sens = (((profile||[])[0]||{}).store||{}).Default.sens||[];
+    // Find last sens change at/before hour h
+    let val=null; let best=-1; sens.forEach(s=>{ const th=(s.timeAsSeconds||0)/3600; if(th<=h && th>best){ best=th; val=s.value; } });
+    return val!=null? +val : null;
+  }catch{ return null; }
+}
+function expectedIsfForDaypart(day){
+  const map={overnight:1, morning:6, midday:11, evening:17};
+  const key = Object.keys(map).find(k=> (day||'').toLowerCase().startsWith(k));
+  const h = key? map[key]: null; if(h==null) return null; return isfAtHour(h);
+}
+function isfBiasRows(){
+  const rows = (correctionCtx.groups||[]).slice().map(g=>{
+    const parts=(g.group||'').toLowerCase().split('|').map(s=>s.trim());
+    const day=parts[0]||''; const exp=expectedIsfForDaypart(day);
+    const obs = (g.medDropPerU120!=null)? +g.medDropPerU120 : null;
+    const bias = (obs!=null && exp!=null)? +(obs/exp).toFixed(2): null;
+    const biasTxt = bias!=null? (bias>1? `ISF stronger (${bias}×)` : `ISF weaker (${bias}×)`) : 'n/a';
+    return `<tr><td>${esc(g.group||'')}</td><td>${esc(g.n||0)}</td><td>${esc(g.medDrop2h!=null? Math.round(g.medDrop2h): 'n/a')}</td><td>${esc(obs!=null? Math.round(obs): 'n/a')}</td><td>${esc(exp!=null? Math.round(exp): 'n/a')}</td><td>${esc(biasTxt)}</td></tr>`;
+  });
+  return rows.join('');
+}
+const isfBiasTableHtml = `<div class="card"><h3>Corrections @120m (ISF Bias)</h3><table><thead><tr><th>Context</th><th>n</th><th>Median 2h Δ</th><th>Observed drop/U @120m</th><th>Expected ISF</th><th>ISF Bias</th></tr></thead><tbody>${isfBiasRows()}</tbody></table><div class="muted">Bias = Observed ÷ Expected ISF by daypart. Treat small‑n rows as directional only.</div></div>`;
+
 // Embed SVGs
 function readSvg(name){ try { return fs.readFileSync(path.join(distDir,name),'utf8'); } catch { return ''; } }
 function ensureA11y(raw,label){ if(!raw) return raw; return raw.replace('<svg','<svg role="img" aria-label="'+label.replace(/"/g,'&quot;')+'"'); }
@@ -694,6 +738,8 @@ const html = `<!doctype html>
   </details>
  </div>
 </div>
+<div class="muted"><a href="docs/experiments.md">Methods &amp; Experiments</a></div>
+${hypothesesCollapsedHtml}
 ${mostActionableHtml}
 <div class="row">
  <div class="card"><h3>AGP (14‑day)</h3>
@@ -763,11 +809,12 @@ ${mostActionableHtml}
  </div>
 </div>
 <div class="row">
+ ${dinnerLensHtml}
+ ${experimentsHtml}
+</div>
+<div class="row">
  <div class="card scenario-wrapper">
   ${scenarioSectionHtml}
- </div>
- <div class="card"><h3>Top Hypotheses</h3>
-  <table><thead><tr><th>Title</th><th>Lever</th><th>Dir</th><th>Confidence</th></tr></thead><tbody>${cardsRows}</tbody></table>
  </div>
 </div>
 <div class="row">
@@ -808,9 +855,7 @@ ${mostActionableHtml}
     })()}</ul>
   </div>
  </div>
- <div class="card"><h3>Progress</h3>
-  <ul>${(Array.isArray(progress.items)?progress.items:[]).map(i=>`<li>${esc(i)}</li>`).join('')}</ul>
- </div>
+ ${isfBiasTableHtml}
 </div>
 </body></html>`;
 
