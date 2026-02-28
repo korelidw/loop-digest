@@ -74,6 +74,10 @@ if(buildVerOverride){
 const ver = buildVerOverride || `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}-${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
 const tzNowFmt = new Intl.DateTimeFormat('en-US',{timeZone:'America/Chicago', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', hour12:false});
 const buildTimeStr = tzNowFmt.format(now);
+// Git commit (repo) for traceability
+const repoDir = path.join(process.env.HOME,'Documents','Github','loop-digest');
+let gitSha = null; try { gitSha = require('child_process').execSync(`git -C "${repoDir}" rev-parse --short HEAD`,{stdio:['ignore','pipe','ignore']}).toString().trim(); } catch {}
+
 
 // Loop settings strip
 let ls = (Array.isArray(profile) && profile.length && (profile[0].loopSettings || profile[0])) || {};
@@ -727,6 +731,19 @@ function buildHourlyStripe(hourly){
 }
 const hourlyStripeBlock = buildHourlyStripe((overlay && overlay.hourly)||[]);
 const correctionsHeatmapBlock = corrHeatmap2hSvg || '<div class="muted">Corrections heatmap unavailable</div>';
+// Midday corrections tracker (11–13), contrasts 2h vs 3h and flags rebound
+const middayTrackerBlock = (()=>{
+  try{
+    const lt = (correctionGrid['lt']||{}).midday || null;
+    const mid = (correctionGrid['mid']||{}).midday || null;
+    if(!lt && !mid) return '';
+    function cell(g){ if(!g||!g.n) return null; const d2 = (g.medDrop2h!=null? Math.round(g.medDrop2h): null); const d3 = (g.medDrop3h!=null? Math.round(g.medDrop3h): null); const reb = (d2!=null && d3!=null) ? (d3 < d2) : false; const ine = g.pctIneffective2h!=null? Math.round(g.pctIneffective2h): null; return {n:g.n,d2,d3,reb,ine}; }
+    const a = cell(lt), b = cell(mid);
+    function chip(label,c){ if(!c) return `<span class="exp-chip muted"><span>${label}</span><strong>n/a</strong></span>`; const r = c.reb? 'high':'low'; return `<span class="exp-chip ${r}"><span>${label}</span><strong>${c.d2!=null?('Δ2h '+(c.d2>0?'↓ '+c.d2:'↑ '+Math.abs(c.d2))):'Δ2h n/a'} · ${c.d3!=null?('Δ3h '+(c.d3>0?'↓ '+c.d3:'↑ '+Math.abs(c.d3))):'Δ3h n/a'} · n=${c.n}${c.ine!=null?' · '+c.ine+'% ineffect2h':''}</strong></span>`; }
+    const note = '<div class="muted" style="font-size:11px;margin-top:4px">Rebound = 3h drop smaller than 2h (or rise by 3h). Treat as directional; avoid stacking; verify carb logging.</div>';
+    return `<div class="card" style="margin-top:10px"><h4 style="margin:0 0 6px">Midday corrections tracker</h4><div class="exp-chips">${chip('IOB <0.5',a)}${chip('IOB 0.5–1.5',b)}</div>${note}</div>`;
+  }catch{return ''}
+})();
 
 // KPI chip strip (TIR/TBR/TAR, CV, GRI) with optional deltas vs prior window
 function sum(obj, keys){ return keys.reduce((a,k)=> a + (obj[k]||0), 0); }
@@ -949,7 +966,7 @@ const html = `<!doctype html>
 </head>
 <body>
 <h1>Loop Digest Dashboard</h1>
-<div class="header"><strong>Build:</strong> ${ver} · <strong>Build time (CT):</strong> ${esc(buildTimeStr)} · <strong>Data window (CT):</strong> ${esc(startStr)} → ${esc(endStr)} · <strong>File:</strong> index-${ver}.html · <strong>Inputs hash:</strong> ${hash}</div>
+<div class="header"><strong>Build:</strong> ${ver} · <strong>Build time (CT):</strong> ${esc(buildTimeStr)} · <strong>Commit:</strong> ${esc(gitSha||'n/a')} · <strong>Data window (CT):</strong> ${esc(startStr)} → ${esc(endStr)} · <strong>File:</strong> index-${ver}.html · <strong>Inputs hash:</strong> ${hash}</div>
 <div class="strip">${esc(loopStrip)}</div>
 <small>Time zone: ${(review && review.meta && review.meta.tz) ? review.meta.tz : 'America/Chicago'} · Last progress update: ${esc(progress.updatedAt||'n/a')}</small>
 <div class="row">
@@ -1187,6 +1204,7 @@ ${whatToCheckHtml}
   </div>
   <div class="heatmap-scroll">${correctionsHeatmapBlock}</div>
   <div class="heatmap-note">Blue = stronger drops, white = neutral, orange/red = weak or rising corrections. Overlay text shows n | %ineff2h.</div>
+  ${middayTrackerBlock}
   <details class="isf-bias-wrap" style="margin-top:10px">
     <summary><strong>ISF Bias (Advanced)</strong></summary>
     <div class="muted" style="margin-top:6px">Directional only. Raw mg/dL/U hidden by design; categories based on median bias per U (|bias| ≤20 → Near expected; >20 → Stronger/Weaker). Rows with n&lt;30 or confounded by constraints are hidden.</div>
