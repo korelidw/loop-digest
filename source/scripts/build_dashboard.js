@@ -754,7 +754,8 @@ const nowVals = {
   TIR: pct(tirCounts.inRange||0, totalReadings),
   TBR: pct(sum(tirCounts,['veryLow','low']), totalReadings),
   // Note: metrics.tir.high already INCLUDES veryHigh (>250). Do not add veryHigh again.
-  TAR: pct(tirCounts.high||0, totalReadings),
+  // TAR uses both high and veryHigh bins (>180 includes >250)
+  TAR: pct(sum(tirCounts,['high','veryHigh']), totalReadings),
   CV: (metrics.cv!=null? +(+metrics.cv).toFixed(1): null),
   GRI: (metrics.risk&&metrics.risk.GRI!=null? +(+metrics.risk.GRI).toFixed(2): null)
 };
