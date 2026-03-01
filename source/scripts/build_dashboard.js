@@ -116,6 +116,24 @@ const correctionIobBands = [
   {key:'mid', label:'IOB 0.5–1.5'},
   {key:'gt', label:'IOB >1.5'}
 ];
+
+// Constraint overlay per daypart (Pred ≤ suspend avg by hour window)
+const overlayHourly = (overlay && Array.isArray(overlay.hourly)) ? overlay.hourly : [];
+function avgVals(vals){ const v = vals.filter(x=> typeof x==='number' && !Number.isNaN(x)); if(!v.length) return null; return v.reduce((a,b)=>a+b,0)/v.length; }
+function hoursForDaypart(key){
+  if(key==='overnight') return [0,1,2,3];
+  if(key==='morning') return [6,7,8,9];
+  if(key==='midday') return [11,12,13];
+  if(key==='evening') return [17,18,19,20,21];
+  return [];
+}
+const daypartAvgPred = correctionDayparts.reduce((acc,dp)=>{
+  const hrs = hoursForDaypart(dp.key);
+  const vals = hrs.map(h=> (overlayHourly[h] && overlayHourly[h].pctPredLeSuspend!=null)? overlayHourly[h].pctPredLeSuspend: null);
+  acc[dp.key] = avgVals(vals);
+  return acc;
+},{});
+function predBadgeColor(val){ if(val==null) return '#95a5a6'; if(val>=25) return '#e74c3c'; if(val>=15) return '#f39c12'; return '#1abc9c'; }
 function parseCorrectionGroupKey(groupStr){
   if(!groupStr) return null;
   const parts = groupStr.toLowerCase().split('|').map(s=>s.trim());
@@ -187,10 +205,15 @@ function buildHeatmapSvg(hours){
   let headerTexts = '';
   correctionDayparts.forEach((dp,idx)=>{
     const x = leftW + idx*cellW + cellW/2;
+    // Daypart label
     headerTexts += `<text x="${x}" y="28" text-anchor="middle" font-size="13" font-weight="600">${dp.label}</text>`;
     if(dp.window){
       headerTexts += `<text x="${x}" y="44" text-anchor="middle" font-size="10" fill="#666">${dp.window}</text>`;
     }
+    // Pred ≤ suspend badge (avg for this daypart)
+    const p = (daypartAvgPred && daypartAvgPred[dp.key]!=null) ? Math.round(daypartAvgPred[dp.key]) : null;
+    const badgeFill = predBadgeColor(p);
+    headerTexts += `<g><circle cx="${x}" cy="14" r="7" fill="${badgeFill}"/>${p!=null?`<text x="${x}" y="17" text-anchor="middle" font-size="9" fill="#fff">${p}</text>`:`<text x="${x}" y="17" text-anchor="middle" font-size="9" fill="#999">–</text>`}</g>`;
   });
   let rowLabels = '';
   correctionIobBands.forEach((band,idx)=>{
