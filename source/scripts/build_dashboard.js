@@ -500,15 +500,15 @@ function optionsRankedFor(card){
     return [
       {label:'+20 min pre-bolus', detail:'expect ↓↓↓ 4h TAR; higher predicted-low risk if carbs delayed', score:4, impact:'knocks down lunch TAR fastest', ...baseRisk},
       {label:'+10 min pre-bolus', detail:'expect ↓↓ 4h TAR; similar TBR; monitor predicted lows', score:3, impact:'reduces post-lunch peaks when on time', ...baseRisk},
-      {label:'ICR stronger ~10%', detail:'expect ↓ peaks; moderate low risk; validate with 3–5 logged lunches', score:2, impact:'trims peaks when timing is capped', ...baseRisk},
-      {label:'ICR stronger ~20%', detail:'larger effect; higher low risk; only if milder options insufficient', score:1, impact:'is reserved if gentler shifts fail', ...baseRisk},
+      {label:'ICR stronger (directional)', detail:'expect ↓ peaks; validate with 3–5 logged lunches', score:2, impact:'trims peaks when timing is capped', ...baseRisk},
+      {label:'ICR stronger (more aggressive)', detail:'larger effect; higher low risk; only if gentler shifts insufficient', score:1, impact:'is reserved if gentler shifts fail', ...baseRisk},
       {label:'Timing unchanged (baseline)', detail:'for comparison / logging control', score:0, impact:'keeps a baseline reference', ...baseRisk}
     ];
   }
   if(title.includes('correction')||title.includes('isf')){
     return [
-      {label:'ISF stronger ~20%', detail:'↑↑ 2–3h drops; ↓ 90–180 min TAR; avoid stacking', score:3, impact:'cleans up stubborn corrections fastest', ...baseRisk},
-      {label:'ISF stronger ~10%', detail:'↑ 2–3h drops; ↓ TAR; monitor predicted lows', score:2, impact:'delivers moderate clean-up with less risk', ...baseRisk},
+      {label:'ISF stronger (directional)', detail:'↑↑ 2–3h drops; ↓ 90–180 min TAR; avoid stacking', score:3, impact:'cleans up stubborn corrections fastest', ...baseRisk},
+      {label:'ISF slightly stronger (directional)', detail:'↑ 2–3h drops; ↓ TAR; monitor predicted lows', score:2, impact:'delivers moderate clean-up with less risk', ...baseRisk},
       {label:'As-is (baseline)', detail:'for comparison', score:1, impact:'keeps the status quo reference', ...baseRisk}
     ];
   }
@@ -811,10 +811,11 @@ function chip(label, value, prev, unit){
 const kpiStripHtml = `<div class="kpi-strip">${[
   chip('TIR', nowVals.TIR, priorVals&&priorVals.TIR, '%'),
   chip('TBR', nowVals.TBR, priorVals&&priorVals.TBR, '%'),
-  chip('TAR', nowVals.TAR, priorVals&&priorVals.TAR, '%'),
+  chip('TAR (incl. >250)', nowVals.TAR, priorVals&&priorVals.TAR, '%'),
   chip('CV', nowVals.CV, priorVals&&priorVals.CV, ''),
   chip('GRI', nowVals.GRI, priorVals&&priorVals.GRI, '')
-].join('')}<div class="kpi-meta">Coverage: ${metrics.meta&&metrics.meta.coverage?(metrics.meta.coverage*100).toFixed(0):'0'}%</div></div>`;
+].join('')}<div class=\"kpi-meta\">Coverage: ${metrics.meta&&metrics.meta.coverage?(metrics.meta.coverage*100).toFixed(0):'0'}%</div></div>
+<div class=\"kpi-legend muted\" title=\"See memory/shared/definitions.md\">Note: TAR includes Very High (>250). Sums can exceed 100%. Exclusive bins planned next build.</div>`;
 
 // Experiments: restored v0 formatting with chips
 function formatChip(label, value, unit='%'){
@@ -986,10 +987,11 @@ const html = `<!doctype html>
  .exp-chip strong{font-size:13px;color:#111}
  @media(max-width:960px){ .reliability-chips{width:100%} .kpi-meta{width:100%;margin-left:0} }
  @media(max-width:768px){ .scenario-card header{flex-direction:column} .gate-row{justify-content:flex-start} }
+.chip-adv{display:inline-block;margin-left:6px;padding:2px 6px;border-radius:10px;background:#1f6feb;color:#fff;font-size:11px;vertical-align:middle}
 </style>
 </head>
 <body>
-<h1>Loop Digest Dashboard</h1>
+<h1>Loop Digest Dashboard ${(()=>{ try{ const defs=fs.readFileSync(path.join(root,'memory','shared','definitions.md'),'utf8'); return /Advanced Evidence Mode:\s*ENABLED/i.test(defs)? '<span class="chip-adv" title="Advanced Evidence mode">Advanced</span>' : ''; }catch{ return '' } })()}</h1>
 <div class="header"><strong>Build:</strong> ${ver} · <strong>Build time (CT):</strong> ${esc(buildTimeStr)} · <strong>Commit:</strong> ${esc(gitSha||'n/a')} · <strong>Data window (CT):</strong> ${esc(startStr)} → ${esc(endStr)} · <strong>File:</strong> index-${ver}.html · <strong>Inputs hash:</strong> ${hash}</div>
 <div class="strip">${esc(loopStrip)}</div>
 <small>Time zone: ${(review && review.meta && review.meta.tz) ? review.meta.tz : 'America/Chicago'} · Last progress update: ${esc(progress.updatedAt||'n/a')}</small>
@@ -1023,7 +1025,9 @@ const html = `<!doctype html>
 ${mostActionableHtml}
 ${(()=>{ // Experiment peek mini-card under Most Actionable
   const xp = correctionCtx && correctionCtx.experimentPeek;
-  if(!xp || !xp.recent) return '';
+  if(!xp || !xp.recent){
+    return `<div class=\"card\" style=\"border-left:4px solid #0d6efd\"><div style=\"display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap\"><h3 style=\"margin:0\">Experiment peek</h3><div class=\"muted\">Recent vs 7d baseline</div></div><div class=\"exp-empty muted\" style=\"margin-top:4px;font-size:12px;line-height:1.4\">No experiment slices met the display rules.<br/>Add or update entries in <code>shared/experiment_ledger.jsonl</code> (or enable a Corrections lens in <code>data/correction_context.json</code>) and rebuild.</div></div>`;
+  }
   function chip(label,val,goodDir){
     if(val==null || Number.isNaN(val)) return `<span class="exp-chip muted"><span>${esc(label)}</span><strong>n/a</strong></span>`;
     const signGood = (goodDir==='down' && val<0) || (goodDir==='up' && val>0) || (goodDir==='flat' && Math.abs(val)<0.1);

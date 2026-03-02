@@ -78,7 +78,7 @@ function dirDeltaTAR(vFrom, vTo){
     } else if(ine<=20 && d2>=35){ dirHyper='flat'; dirHypo='slight increase'; }
     const safety = ['Avoid back-to-back corrections within DIA','Higher ISF increases drop magnitude; watch lows 2–3h post-bolus'];
     const card = {
-      title: `Corrections: ISF ±10–20% — ${g.group}`,
+      title: `Corrections: ISF direction — ${g.group}`,
       timeWindow: g.group,
       levers: ['ISF'],
       direction: 'ISF stronger → larger drops; weaker → smaller drops',
