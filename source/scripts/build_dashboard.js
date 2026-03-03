@@ -696,9 +696,24 @@ const whatToCheckHtml = (()=>{
     function fmt(ms){ return f.format(new Date(ms)); }
     const worst=(correctionCtx.groups||[]).filter(g=> (g.n||0)>=15).slice().sort((a,b)=> (b.pctIneffective2h||0)-(a.pctIneffective2h||0)).slice(0,2);
     function label(g){ const m=(g.group||'').split('|').map(s=>s.trim()); return `${m[0]} · ${m[1]}`; }
-    const listMissed = top.length? top.map(m=>`<li>Possible missed carbs around ${fmt(m.ms)} (rise ~${m.rise} mg/dL)</li>`).join('') : '<li class="muted">No strong missed‑carb rises in the last 24h.</li>';
-    const listWeak = worst.length? worst.map(w=>`<li>Weak corrections in ${label(w)} — n=${w.n}, ${Math.round(w.pctIneffective2h||0)}% ineffective @2h</li>`).join('') : '';
-    return `<div class="card"><h3>What to check today</h3><ul>${listMissed}${listWeak}</ul><div class="muted">Directional cues only. If a missed‑carb aligns with real food, consider earlier logging/timing. For weak corrections, try clean trials in those contexts (avoid stacking; watch predicted‑lows).</div></div>`;
+    // Build lines
+    const lines=[];
+    if(top.length){
+      top.forEach(m=> lines.push(`Possible missed carbs around ${fmt(m.ms)} (rise ~${m.rise} mg/dL)`));
+    } else {
+      lines.push('No strong missed‑carb rises in the last 24h.');
+    }
+    if(worst.length){
+      worst.forEach(w=> lines.push(`Weak corrections in ${label(w)} — n=${w.n}, ${Math.round(w.pctIneffective2h||0)}% ineffective @2h`));
+    }
+    function todayChip(text){
+      if(/^possible missed carbs/i.test(text)) return {label:'Missed carb', cls:'missed'};
+      if(/^weak corrections/i.test(text)) return {label:'Correction', cls:'correction'};
+      if(/low|hypo/i.test(text)) return {label:'Hypo risk', cls:'hypo'};
+      return null;
+    }
+    const lis = lines.map(it=>{ const chip=todayChip(it); const chipHtml = chip? `<span class=\"today-chip today-chip--${chip.cls}\">${chip.label}</span>`: ''; const cls = /No strong missed/.test(it)? ' class=\"muted\"': '' ; return `<li${cls}>${chipHtml}${it}</li>`; }).join('');
+    return `<div class=\"card\"><h3>What to check today</h3><ul>${lis}</ul><div class=\"muted\">Directional cues only. If a missed‑carb aligns with real food, consider earlier logging/timing. For weak corrections, try clean trials in those contexts (avoid stacking; watch predicted‑lows).</div></div>`;
   }catch{ return ''; }
 })();
 
@@ -985,6 +1000,9 @@ const html = `<!doctype html>
  .exp-chip{display:flex;flex-direction:column;gap:2px;padding:6px 8px;border-radius:10px;border:1px solid #e0e0e0;font-size:10px;min-width:100px;background:#fff}
  .exp-chip span{color:#555;font-weight:500}
  .exp-chip strong{font-size:13px;color:#111}
+ .today-chip{display:inline-block;margin-right:6px;padding:2px 6px;border-radius:999px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;background:#eef2ff;color:#1d4ed8}
+ .today-chip--correction{background:#fef3c7;color:#b45309}
+ .today-chip--hypo{background:#fee2e2;color:#b91c1c}
  @media(max-width:960px){ .reliability-chips{width:100%} .kpi-meta{width:100%;margin-left:0} }
  @media(max-width:768px){ .scenario-card header{flex-direction:column} .gate-row{justify-content:flex-start} }
 .chip-adv{display:inline-block;margin-left:6px;padding:2px 6px;border-radius:10px;background:#1f6feb;color:#fff;font-size:11px;vertical-align:middle}
