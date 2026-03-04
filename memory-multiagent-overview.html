@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>From Chat to Coordinated Memory + Multi‑Agent Workflow</title>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<style>
+  :root{--fg:#1b1b1b;--muted:#555;--bg:#f8f9fb;--card:#fff;--border:#e5e7eb;--accent:#0d6efd}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);font:16px/1.55 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+  .wrap{max-width:980px;margin:24px auto;padding:0 16px}
+  h1{font-size:28px;margin:0 0 8px}
+  h2{font-size:22px;margin:24px 0 8px}
+  h3{font-size:18px;margin:18px 0 8px}
+  p{margin:8px 0}
+  .muted{color:var(--muted)}
+  .chip{display:inline-block;border:1px solid var(--border);border-radius:999px;padding:3px 8px;font-size:12px;background:#eef2ff;color:#1d4ed8;margin-left:6px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px;margin:14px 0}
+  ul{margin:6px 0 6px 22px}
+  code,pre{font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:13px}
+  pre{background:#0f172a;color:#e2e8f0;border-radius:8px;padding:12px;overflow:auto}
+  .two-col{display:grid;grid-template-columns:1fr;gap:16px}
+  @media(min-width:900px){ .two-col{grid-template-columns:1fr 1fr} }
+  .footer{margin:24px 0 40px;color:var(--muted);font-size:13px}
+  .print-only{display:none}
+  @media print{ .mermaid{display:none !important} .print-only{display:block !important} details{display:none} }
+</style>
+<!-- Mermaid for diagrams -->
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({ startOnLoad: true, theme: 'default' });
+</script>
+</head>
+<body>
+  <div class="wrap">
+    <h1>From Chat to Coordinated Memory + Multi‑Agent Workflow <span class="chip">Overview</span></h1>
+    <p class="muted">Audience: engineering/product colleagues evaluating how to move beyond ephemeral chat toward durable, auditable, multi‑agent work.</p>
+
+    <div class="card">
+      <h2>Problem</h2>
+      <p>Pure chat is ephemeral: context fades, decisions aren’t traceable, and results aren’t reproducible.</p>
+      <h2>Concept</h2>
+      <p>Add a persistent, human‑readable memory plus role‑based agents and a deterministic data pipeline. The AI becomes a narrator/critic anchored to artifacts, not a free‑text oracle.</p>
+    </div>
+
+    <div class="two-col">
+      <div class="card">
+        <h2>Key Components</h2>
+        <ol>
+          <li><strong>Deterministic pipeline</strong> (source of truth)<br/>Nightscout fetch → analyses → artifacts (data/*.json, dist/*.svg) → dashboard (site/index‑YYYYMMDD‑HHMM.html)</li>
+          <li><strong>Structured memory</strong> (files, not a black box)
+            <ul>
+              <li><code>memory/runs/YYYY‑MM‑DD.md</code>: daily journal of record used by all agents</li>
+              <li><code>memory/shared/*</code>: definitions, guardrails, open_questions, literature, experiment_ledger, decisions</li>
+              <li><code>memory/agents/&lt;role&gt;/scratch.md</code>: proposals/diffs awaiting approval</li>
+              <li><code>memory/YYYY‑MM‑DD.md</code>: durable end‑of‑day highlights</li>
+            </ul>
+          </li>
+          <li><strong>Role‑based agents</strong> (separation of concerns)
+            <ul>
+              <li>Analyst → data quality/KPIs, directional hypotheses</li>
+              <li>Researcher → testable hypotheses, falsification tests + evidence</li>
+              <li>Code Agent → UI/content proposals, safe diffs (await approval)</li>
+              <li>Logging Audit → data fidelity + clean‑only contrasts</li>
+              <li>Release → promote durable outcomes; keep a single prioritized backlog</li>
+            </ul>
+          </li>
+          <li><strong>Guardrails</strong>: evidence‑backed, directional recommendations; uncertainty and safety notes; no automatic therapy changes.</li>
+        </ol>
+      </div>
+      <div class="card">
+        <h2>Why This Beats Chat</h2>
+        <ul>
+          <li><strong>Traceability</strong>: every claim points to artifacts (data JSON, site build, commit SHA, literature IDs)</li>
+          <li><strong>Repeatability</strong>: jobs + memory yield consistent, auditable outputs</li>
+          <li><strong>Collaboration</strong>: specialized agents share structured context, not just token history</li>
+          <li><strong>Safety</strong>: guardrails constrain outputs to decision support</li>
+        </ul>
+        <h3>Where to Look</h3>
+        <ul>
+          <li><code>/data</code> → analysis JSON; <code>/dist</code> → SVGs; <code>/site</code> → dashboards</li>
+          <li><code>/memory/runs</code> → today’s journal; <code>/memory/shared</code> → durable context; <code>/memory/agents/*/scratch.md</code> → per‑role backlogs</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class=\"card\">
+      <h2>Memory Structure (Mermaid)</h2>
+      <div class=\"mermaid\">
+flowchart TD
+  A[memory/runs/YYYY-MM-DD.md\\nDaily journal of record] --> B[memory/shared/definitions.md\\n+ guardrails.md]
+  A --> C[memory/shared/open_questions.md]
+  A --> D[memory/shared/literature/\\nnotes + index.md]
+  A --> E[memory/shared/experiment_ledger.jsonl]
+  A --> F[memory/agents/*/scratch.md\\nrole backlogs/diffs]
+  G[data/*.json, dist/*.svg, site/index-*.html]\\n(Deterministic artifacts) --> A
+  B --> A
+  C --> A
+  D --> A
+  E --> A
+  F --> A
+      </div>
+      <pre class=\"print-only\">memory/
+  runs/
+    2026-03-04.md        &lt;- daily journal (read/write by all agents)
+  shared/
+    definitions.md       &lt;- common vocab + mode flags (e.g., Advanced Evidence)
+    guardrails.md        &lt;- safety/constraints
+    open_questions.md    &lt;- single prioritized backlog
+    literature/          &lt;- curated notes + index
+    experiment_ledger.jsonl
+    decisions.md         &lt;- rare, directional decisions (two-signals rule)
+  agents/
+    analyst/scratch.md   &lt;- working notes, not auto-shipped
+    researcher/scratch.md
+    code/scratch.md      &lt;- diffs/proposals awaiting approval
+  2026-03-02.md          &lt;- durable end-of-day highlights (optional)
+
+Artifacts (source of truth)
+  data/*.json            &lt;- computed stats
+  dist/*.svg             &lt;- visuals
+  site/index-YYYYMMDD-HHMM.html  &lt;- dashboard builds</pre>
+    </div>
+
+    <div class=\"card\">
+      <h2>Agent Flow (Mermaid)</h2>
+      <div class=\"mermaid\">
+sequenceDiagram
+  autonumber
+  participant P as Pipeline (deterministic)
+  participant An as Analyst
+  participant Re as Researcher
+  participant Co as Code Agent
+  participant Au as Logging Audit
+  participant Rl as Release
+
+  P->>Artifacts: Fetch + analyses -> data/*.json, dist/*.svg, site/index-*.html
+  Artifacts-->>An: Read artifacts
+  An->>Runs: Update today's Analyst section (KPI, patterns, hypotheses)
+  Re->>Runs: Read Analyst; add hypotheses+falsification; cite literature
+  Re->>Shared: Promote literature notes/index
+  Co->>Runs: Read Analyst/Researcher
+  Co->>Scratch: Write UI proposals + safe diffs (await approval)
+  Au->>Runs: Log data quality, clean-only shifts
+  Rl->>Runs: Summarize day; promote durable items -> Shared
+  Rl->>Shared: Update open questions / ledger / links
+      </div>
+      <pre class=\"print-only\">[Deterministic Pipeline] -> data/*.json, dist/*.svg, site/index-*.html
+          |
+          v
+[Analyst] writes -> memory/runs/YYYY-MM-DD.md (findings, hypotheses)
+          |
+          v
+[Researcher] reads run -> adds tests + evidence; promotes literature -> shared/
+          |
+          v
+[Code Agent] reads run/shared -> drafts diffs -> agents/code/scratch.md (await approval)
+          |
+          +-[Logging Audit] appends data quality + clean-only contrasts to run
+          v
+[Release] summarizes day; promotes durable items to shared/ (open_questions, ledger, links)</pre>
+    </div>
+
+    <div class="card">
+      <h2>How It Coordinated in Our Run</h2>
+      <ul>
+        <li><strong>Advanced Evidence Mode</strong> toggled in <code>shared/definitions.md</code>; agents started including explicit n, medians/IQRs, %ineffective@2h.</li>
+        <li><strong>Code Agent</strong> staged safe UI tweaks (Advanced badge, KPI legend, Experiment Peek empty‑state, “What to check today” chips); we approved and published.</li>
+        <li><strong>Researcher</strong> reconciled literature vs data (midday sensitivity) and prioritized stratifying corrections by constraint state before ISF discussion.</li>
+        <li><strong>Release</strong> consolidated outcomes, updated open questions, and linked dashboard builds + literature IDs.</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>Next Steps (Generalizable)</h2>
+      <ul>
+        <li>Formalize exclusive KPI bins (no overlaps) and add tests.</li>
+        <li>Enrich correction context with per‑event constraint state; surface gating chips in heatmap rows.</li>
+        <li>Add a lightweight PR flow for Code Agent diffs prior to publish.</li>
+      </ul>
+    </div>
+
+    <div class="footer">Single‑page export generated on 2026‑03‑04. Mermaid renders client‑side; ASCII fallbacks included for portability.</div>
+  </div>
+</body>
+</html>
