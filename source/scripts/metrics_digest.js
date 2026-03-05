@@ -25,9 +25,16 @@ const sgv = entries.map(e=>({mg:e.sgv||e.mgdl||e.mgdL, ms:e.date|| (e.dateString
 const values = sgv.map(x=>x.mg);
 const n = values.length;
 
-// TIR/TBR/TAR counts
+// TIR/TBR/TAR counts (exclusive bins)
+// veryLow: <54 ; low: 54–69 ; inRange: 70–180 ; high: 181–250 ; veryHigh: >250
 let veryLow=0, low=0, inRange=0, high=0, veryHigh=0;
-for(const mg of values){ if(mg<54) veryLow++; if(mg<70) low++; else if(mg<=180) inRange++; else high++; if(mg>250) veryHigh++; }
+for(const mg of values){
+  if(mg<54){ veryLow++; }
+  else if(mg<70){ low++; }
+  else if(mg<=180){ inRange++; }
+  else if(mg<=250){ high++; }
+  else { veryHigh++; }
+}
 
 // Coverage estimate (expected every 5 min)
 let coverage=null, durationDays=null; if(sgv.length){ const dur = sgv[sgv.length-1].ms - sgv[0].ms; durationDays = +(dur/(24*3600*1000)).toFixed(2); const expected = dur/(5*60*1000); coverage = expected>0? Math.min(1, sgv.length/expected): null; }
