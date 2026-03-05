@@ -86,7 +86,11 @@ const loopStrip = `Strategy: ${esc(ls.dosingStrategy||'n/a')} · Suspend: ${esc(
 // Hypotheses table rows
 let cardsRows = '';
 (review.cards||[]).slice(0,5).forEach(c=>{
-  cardsRows += `<tr><td>${esc(c.title)}</td><td>${esc((c.levers||[]).join(',')||'')}</td><td>${esc(c.direction||'')}</td><td>${esc(c.confidence||'')}</td></tr>`;
+  const levers = (c.levers||[]).join(',')||'';
+  const dir = c.direction||'';
+  const leverTip = levers? ` title=\"Lever(s): ${esc(levers)}\"` : '';
+  const dirTip = dir? ` title=\"Direction: ${esc(dir)}\"` : '';
+  cardsRows += `<tr><td>${esc(c.title)}</td><td${leverTip}>${esc(levers)}</td><td${dirTip}>${esc(dir)}</td><td>${esc(c.confidence||'')}</td></tr>`;
 });
 const hypothesesCount = (review.cards||[]).length || 0;
 const hypothesesLevers = Array.from(new Set((review.cards||[]).flatMap(c=> Array.isArray(c.levers)? c.levers: []))).filter(Boolean);
@@ -1019,7 +1023,7 @@ const html = `<!doctype html>
     ${kpiStripHtml}
     <div class="reliability-chips">${reliabilityChipsBlock}</div>
   </div>
-  <div class="sub-bar muted">Built ${esc(buildTimeStr)} CT • Data ${esc(startStr)} → ${esc(endStr)} • v=${ver}</div>
+  <div class=\"sub-bar muted\">Built ${esc(buildTimeStr)} CT • Data ${esc(startStr)} → ${esc(endStr)} • v=${ver} • <a href=\"https://korelidw.github.io/loop-digest/memory-multiagent-overview.html\" target=\"_blank\" rel=\"noopener\">Overview</a></div>
   <details style="margin-top:6px">
     <summary><strong>Reliability & safety details</strong> (daily Pred ≤ suspend, Comm errors, and 14‑day sparkline)</summary>
     <div class="sentinel-header" style="margin-top:6px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">
