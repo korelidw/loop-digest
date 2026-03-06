@@ -1024,6 +1024,21 @@ const html = `<!doctype html>
     <div class="reliability-chips">${reliabilityChipsBlock}</div>
   </div>
   <div class=\"sub-bar muted\">Built ${esc(buildTimeStr)} CT • Data ${esc(startStr)} → ${esc(endStr)} • v=${ver} • <a href=\"https://korelidw.github.io/loop-digest/memory-multiagent-overview.html\" target=\"_blank\" rel=\"noopener\">Overview</a></div>
+  ${(()=>{ // Missed-carb ribbon (last 24h)
+    try{
+      const nowMs = Date.now();
+      const last24 = nowMs - 24*3600*1000;
+      const pts = latestEntries.map(e=>({mg:e.sgv||e.mgdl||e.mgdL, ms:e.date|| (e.dateString? Date.parse(e.dateString): undefined)})).filter(x=>typeof x.mg==='number'&&typeof x.ms==='number'&& x.ms>=last24).sort((a,b)=>a.ms-b.ms);
+      if(pts.length<6) return '';
+      const carbs = latestTreats.filter(t=> typeof t.carbs==='number' && t.carbs>0).map(t=> t.mills || (t.created_at? Date.parse(t.created_at): (t.createdAt? Date.parse(t.createdAt): undefined))).filter(ms=> typeof ms==='number');
+      function carbNear(ms){ return carbs.find(ct=> ct>= ms - 15*60000 && ct<= ms + 10*60000); }
+      const marks=[]; for(let i=0;i<pts.length;i++){ const s=pts[i]; const win=pts.filter(p=> p.ms>s.ms && p.ms<= s.ms + 60*60000); if(!win.length) break; const rise=Math.max(...win.map(p=>p.mg - s.mg)); if(rise>=50 && !carbNear(s.ms)){ marks.push({ms:s.ms, rise:Math.round(rise)}); i+=6; } }
+      const width=520, height=24, padL=6, padR=6; const t0=pts[0].ms, t1=pts[pts.length-1].ms; const scaleX=ms=> padL + Math.round((ms-t0)/(t1-t0||1) * (width-padL-padR));
+      const circles = marks.map(m=>`<circle cx=\"${scaleX(m.ms)}\" cy=\"12\" r=\"3\" fill=\"#ef4444\"/>`).join('');
+      const carbDots = carbs.map(ms=>`<circle cx=\"${scaleX(ms)}\" cy=\"12\" r=\"2\" fill=\"#0ea5e9\" opacity=\"0.7\"/>`).join('');
+      return `<div class=\"sub-bar\" title=\"Last 24h: red = possible missed-carb rise; blue = logged carbs\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"${width}\" height=\"${height}\">${carbDots}${circles}<text x=\"${width-padR}\" y=\"20\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">24h</text></svg></div>`;
+    }catch{return ''}
+  })()}
   <details style="margin-top:6px">
     <summary><strong>Reliability & safety details</strong> (daily Pred ≤ suspend, Comm errors, and 14‑day sparkline)</summary>
     <div class="sentinel-header" style="margin-top:6px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">
@@ -1039,12 +1054,25 @@ const html = `<!doctype html>
   <div class="card hypotheses-card">
     <details>
       <summary>Top Hypotheses (n=${hypothesesCount})<span class="hyp-summary-meta">Click to expand table</span></summary>
+      <div class="muted" style="margin:6px 0 8px">
+        <span class="exp-tag" title="Analyst definitions — see definitions.md#analyst"><a href="../memory/shared/definitions.md#analyst" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">Analyst</a></span>
+        <span class="exp-tag" title="Researcher definitions — see definitions.md#researcher"><a href="../memory/shared/definitions.md#researcher" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">Researcher</a></span>
+      </div>
       <table><thead><tr><th>Title</th><th>Lever</th><th>Dir</th><th>Confidence</th></tr></thead><tbody>${cardsRows}</tbody></table>
     </details>
     <div class="hyp-summary-line">${esc(hypothesesSummaryLine)}</div>
   </div>
 </div>
 ${mostActionableHtml}
+${(()=>{ // High-ineffectiveness banner just under Most Actionable
+  try{
+    const worst=(correctionCtx.groups||[]).filter(g=> (g.n||0)>=15).slice().sort((a,b)=> (b.pctIneffective2h||0)-(a.pctIneffective2h||0)).slice(0,2);
+    if(!worst.length) return '';
+    function label(g){ const m=(g.group||'').split('|').map(s=>s.trim()); return `${m[0]} · ${m[1]}`; }
+    const items = worst.map(w=>`<li>${esc(label(w))} — n=${w.n}, ${Math.round(w.pctIneffective2h||0)}% ineffective @2h</li>`).join('');
+    return `<div class=\"card\" style=\"border-left:4px solid #ef4444\"><strong>High-ineffectiveness contexts</strong><ul style=\"margin:6px 0 0 16px\">${items}</ul><div class=\"muted\" style=\"margin-top:4px\">Directional only; try clean trials and avoid stacking.</div></div>`;
+  }catch{return ''}
+})()}
 ${(()=>{ // Experiment peek mini-card under Most Actionable
   const xp = correctionCtx && correctionCtx.experimentPeek;
   if(!xp || !xp.recent){
@@ -1120,6 +1148,20 @@ ${whatToCheckHtml}
 </div>
 <div class="row">
  <div class="card"><h3>School Meal Lens</h3>
+  ${(()=>{ // Meal fidelity rail
+    try{
+      const m = (review&&review.meals)||{};
+      const nB = m.breakfast&&m.breakfast.n||0;
+      const nL = m.lunch&&m.lunch.n||0;
+      const nD = m.dinner&&m.dinner.n||0;
+      const nowMs=Date.now(), last24=nowMs-24*3600*1000;
+      const pts = latestEntries.map(e=>({mg:e.sgv||e.mgdl||e.mgdL, ms:e.date|| (e.dateString? Date.parse(e.dateString): undefined)})).filter(x=>typeof x.mg==='number'&&typeof x.ms==='number'&& x.ms>=last24).sort((a,b)=>a.ms-b.ms);
+      const carbs = latestTreats.filter(t=> typeof t.carbs==='number' && t.carbs>0).map(t=> t.mills || (t.created_at? Date.parse(t.created_at): (t.createdAt? Date.parse(t.createdAt): undefined))).filter(ms=> typeof ms==='number');
+      function carbNear(ms){ return carbs.find(ct=> ct>= ms - 15*60000 && ct<= ms + 10*60000); }
+      let missed=0; for(let i=0;i<pts.length;i++){ const s=pts[i]; const win=pts.filter(p=> p.ms>s.ms && p.ms<= s.ms + 60*60000); if(!win.length) break; const rise=Math.max(...win.map(p=>p.mg - s.mg)); if(rise>=50 && !carbNear(s.ms)){ missed++; i+=6; } }
+      return `<div class=\"exp-chips\"><span class=\"exp-chip\"><span>Breakfast n</span><strong>${nB}</strong></span><span class=\"exp-chip\"><span>Lunch n</span><strong>${nL}</strong></span><span class=\"exp-chip\"><span>Dinner n</span><strong>${nD}</strong></span><span class=\"exp-chip\"><span>Missed‑carb signals (24h)</span><strong>${missed}</strong></span></div>`;
+    }catch{return ''}
+  })()}
   <table><thead><tr><th>Window</th><th>Lead bin</th><th>n</th><th>Start BG (med/IQR)</th><th>ΔPeak (med)</th><th>T→180 (med)</th><th>Start trend</th><th>%>180</th><th>Median peak</th></tr></thead><tbody>${schoolRows}</tbody></table>
   <div class="muted">T→180 = return to 180 mg/dL after first >180 crossing within 4h. “≤180” = never >180; “>4h” = no return within 4h.</div>
   <div class="heatmap-interpretation">
@@ -1252,6 +1294,8 @@ ${whatToCheckHtml}
     <h3>Corrections Lens @120m</h3>
     <div class="heatmap-toggle"><strong>2h</strong> · <a href="${corrHeatmap3hHref}" target="_blank" rel="noopener">3h SVG</a></div>
   </div>
+  ${gateChipRow()}
+  <div class="muted" style="font-size:11px;margin:6px 0">Clean-only toggle: ${(()=>{ try{ const clean=load(path.join(dataDir,'correction_context_clean.json')); return (clean&&Array.isArray(clean.groups))? '<strong>ON</strong> (compare deltas inline)': 'unavailable'; }catch{return 'unavailable'} })()}</div>
   <div class="heatmap-scroll">${correctionsHeatmapBlock}</div>
   <div class="heatmap-note">Blue = stronger drops, white = neutral, orange/red = weak or rising corrections. Overlay text shows n | %ineff2h.</div>
   ${middayTrackerBlock}
