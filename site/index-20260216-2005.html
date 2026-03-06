@@ -1,0 +1,512 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="0" />
+<title>Loop Digest Dashboard</title>
+<style>
+ body{font-family: system-ui,-apple-system,Segoe UI,Roboto,sans-serif;margin:20px;background:#fafafa;color:#222}
+ h1{font-size:20px;margin:0 0 8px}
+ .row{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px}
+ .card{border:1px solid #ddd;border-radius:10px;padding:12px;background:#fff;flex:1;min-width:280px;box-shadow:0 1px 2px rgba(0,0,0,0.04)}
+ table{border-collapse:collapse;width:100%;font-size:12px}
+ th,td{border-bottom:1px solid #eee;padding:6px 8px;text-align:left;vertical-align:top}
+ small,.muted{color:#666;font-size:12px}
+ .strip{font-size:11px;color:#444;margin:2px 0 10px}
+ .header{background:#f7f7f7;border:1px solid #eee;border-radius:8px;padding:8px;margin:6px 0 10px}
+ img,svg{max-width:100%;height:auto}
+ .pill{display:inline-block;min-width:24px;padding:2px 6px;border-radius:999px;font-size:11px;color:#fff;text-align:center}
+ .pill.green{background:#1abc9c}.pill.orange{background:#f39c12}.pill.red{background:#e74c3c}
+ .pill.muted{background:#95a5a6}
+ .gate-row{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;margin-top:4px}
+ .gate-chip{display:flex;flex-direction:column;align-items:flex-start;border-radius:8px;padding:4px 6px;font-size:10px;line-height:1;border:1px solid #ddd;min-width:90px}
+ .gate-chip span{color:#555;font-weight:500}
+ .gate-chip strong{font-size:13px;color:#111}
+ .gate-chip.low{background:#ecf9f1;border-color:#a3e6c3}
+ .gate-chip.med{background:#fff8e5;border-color:#f5d086}
+ .gate-chip.high{background:#fdecea;border-color:#fab1a0}
+ .scenario-shell{display:flex;flex-direction:column;gap:12px}
+ .scenario-header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+ .scenario-toggle{display:flex;gap:8px;align-items:center;font-size:12px}
+ .scenario-toggle label{padding:4px 10px;border:1px solid #ccc;border-radius:12px;cursor:pointer}
+ .scenario-shell input{position:absolute;opacity:0;pointer-events:none}
+ .scenario-cards{display:flex;flex-direction:column;gap:12px}
+ .scenario-card{border:1px solid #eee;border-radius:10px;padding:12px;background:#fff}
+ .scenario-card header{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+ .scenario-card h4{margin:0;font-size:16px}
+ .scenario-link{font-size:11px;color:#555}
+ .scenario-context{font-size:11px;color:#555}
+ .scenario-meta{font-size:11px;color:#777;margin-top:2px}
+ .quick-take{background:#f0f6ff;padding:8px;border-radius:8px;font-size:12px;margin:10px 0}
+ .scenario-card ol{margin:0 0 0 18px;padding:0;font-size:12px}
+ .scenario-card li{margin-bottom:6px}
+ .option-label{font-weight:600}
+ .risk-chip{display:inline-block;padding:2px 6px;font-size:10px;border-radius:999px;margin-left:6px}
+ .risk-chip.low{background:#ecf9f1;color:#0b8457}
+ .risk-chip.med{background:#fff3d6;color:#b27100}
+ .risk-chip.high{background:#fdecea;color:#c23616}
+ .scenario-card details{margin-top:6px;font-size:12px}
+ .scenario-card details summary{cursor:pointer;font-weight:600}
+ .scenario-card ul{margin:6px 0 0 18px;padding:0}
+ .scenario-legend{font-size:11px;color:#555;display:none}
+ .scenario-shell input ~ .scenario-cards .view-expanded{display:none}
+ #scenario-compact:checked ~ .scenario-header .scenario-toggle label[for="scenario-compact"]{background:#1abc9c;color:#fff;border-color:#1abc9c}
+ #scenario-expanded:checked ~ .scenario-header .scenario-toggle label[for="scenario-expanded"]{background:#1abc9c;color:#fff;border-color:#1abc9c}
+ #scenario-expanded:checked ~ .scenario-header .scenario-toggle label[for="scenario-compact"]{background:#fff;color:#333;border-color:#ccc}
+ #scenario-compact:checked ~ .scenario-header .scenario-toggle label[for="scenario-expanded"]{background:#fff;color:#333;border-color:#ccc}
+ #scenario-expanded:checked ~ .scenario-cards .view-compact{display:none}
+ #scenario-expanded:checked ~ .scenario-cards .view-expanded{display:block}
+ #scenario-expanded:checked ~ .scenario-legend{display:block}
+ .most-actionable{font-size:12px;margin:0 0 16px}
+ .ma-list{display:flex;gap:12px;flex-wrap:wrap;margin-top:6px}
+ .ma-item{display:flex;align-items:center;gap:6px;padding:6px 8px;border:1px solid #eee;border-radius:999px;font-size:12px}
+ .ma-card{font-weight:600}
+ .ma-arrow{color:#999}
+ .scenario-shell{margin-top:8px}
+ .scenario-wrapper{flex:2 1 420px;min-width:320px}
+ .scenario-shell .scenario-toggle{gap:4px}
+ .header-card .header-top{row-gap:8px}
+ .kpi-strip{display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex:1}
+ .kpi-chip{display:flex;flex-direction:column;padding:6px 10px;border:1px solid #eee;border-radius:10px;background:#fff;min-width:92px}
+ .kpi-label{font-size:11px;color:#555}
+ .kpi-value{font-size:16px;font-weight:600;color:#111}
+ .kpi-meta{font-size:11px;color:#666;margin-left:auto}
+ .delta{font-size:11px;color:#666;margin-left:4px}
+ .hypotheses-card details{margin:0}
+ .hypotheses-card summary{display:flex;align-items:center;justify-content:space-between;cursor:pointer;list-style:none;font-weight:600;font-size:14px}
+ .hypotheses-card summary::-webkit-details-marker{display:none}
+ .hyp-summary-meta{font-size:11px;color:#666;font-weight:400}
+ .hypotheses-card table{margin-top:10px}
+ .hyp-summary-line{font-size:11px;color:#666;margin-top:4px}
+ .reliability-chips{display:flex;gap:8px;flex-wrap:wrap}
+ .sub-bar{margin-top:6px}
+ .corrections-card svg{display:block;margin:0}
+ .heatmap-note{font-size:11px;color:#555;margin-top:6px}
+ .heatmap-interpretation h4{margin:8px 0 4px;font-size:12px}
+ .heatmap-interpretation ul{margin:4px 0 0 16px}
+ .dinner-card table{font-size:12px}
+ .experiments-card ul{list-style:none;margin:0;padding:0}
+ .experiments-card li{border:1px solid #eee;border-radius:10px;padding:10px;margin-bottom:10px;background:#fafafa}
+ .exp-item-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+ .exp-item-head strong{font-size:14px}
+ .exp-status{font-size:11px;border-radius:999px;padding:2px 8px;text-transform:capitalize}
+ .exp-status.logging{background:#ecf9f1;color:#0b8457}
+ .exp-status.planned{background:#fff3d6;color:#b27100}
+ .exp-status.complete{background:#e5e7eb;color:#374151}
+ .exp-status.paused{background:#fdecea;color:#c23616}
+ .exp-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+ .exp-tag{font-size:10px;padding:2px 6px;border-radius:999px;background:#e7efff;color:#0b5cad}
+ .exp-meta{font-size:11px;color:#555;margin-top:2px}
+ .exp-goal{font-size:12px;margin-top:4px;font-weight:600;color:#111}
+ .exp-metric{font-size:11px;margin-top:2px}
+ .exp-notes{font-size:12px;margin-top:4px;color:#444}
+ .experiments-stamp{font-size:11px;color:#666;margin-top:4px}
+ .exp-columns{display:flex;gap:16px;flex-wrap:wrap;margin-top:10px}
+ .exp-column{flex:1;min-width:260px}
+ @media(max-width:960px){ .reliability-chips{width:100%} .kpi-meta{width:100%;margin-left:0} }
+ @media(max-width:768px){ .scenario-card header{flex-direction:column} .gate-row{justify-content:flex-start} }
+</style>
+</head>
+<body>
+<h1>Loop Digest Dashboard</h1>
+<div class="header"><strong>Build:</strong> 20260216-2005 · <strong>Build time (CT):</strong> 02/16, 14:05 · <strong>Data window (CT):</strong> 02/02, 19:10 → 02/16, 19:02 · <strong>File:</strong> index-20260216-2005.html · <strong>Inputs hash:</strong> b4801846b355</div>
+<div class="strip">Strategy: automaticBolus · Suspend: 74 mg/dL · Targets: 95–95 · MaxBasal: 1.45 U/hr · MaxBolus: 4 U · DIA: 6h</div>
+<small>Time zone: America/Chicago · Last progress update: 2026-02-13T14:25:00-06:00</small>
+<div class="row">
+ <div class="card header-card">
+  <div class="header-top" style="display:flex;align-items:flex-start;gap:12px;justify-content:space-between;flex-wrap:wrap">
+    <div class="kpi-strip"><div class="kpi-chip"><span class="kpi-label">TIR</span><span class="kpi-value">55% <span class="delta" title="vs prior">(−2)</span></span></div><div class="kpi-chip"><span class="kpi-label">TBR</span><span class="kpi-value">2% <span class="delta" title="vs prior">(+1)</span></span></div><div class="kpi-chip"><span class="kpi-label">TAR</span><span class="kpi-value">58% <span class="delta" title="vs prior">(+3)</span></span></div><div class="kpi-chip"><span class="kpi-label">CV</span><span class="kpi-value">35 <span class="delta" title="vs prior">(−1.1)</span></span></div><div class="kpi-chip"><span class="kpi-label">GRI</span><span class="kpi-value">14.06 <span class="delta" title="vs prior">(+0.85)</span></span></div><div class="kpi-meta">Coverage: 100%</div></div>
+    <div class="reliability-chips"><span class="reliability-chip high"><span>Pred ≤ suspend · 24h</span><strong>26%</strong></span><span class="reliability-chip med"><span>Comm errors · 24h</span><strong>13%</strong></span></div>
+  </div>
+  <div class="sub-bar muted">Built 02/16, 14:05 CT • Data 02/02, 19:10 → 02/16, 19:02 • v=20260216-2005</div>
+  <details style="margin-top:6px">
+    <summary><strong>Reliability & safety details</strong> (daily Pred ≤ suspend, Comm errors, and 14‑day sparkline)</summary>
+    <div class="sentinel-header" style="margin-top:6px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">
+      <div class="sentinel-asof">As of 2026-02-16</div>
+    </div>
+    <table><thead><tr><th>Day</th><th>Pred ≤ suspend</th><th>Comm errors</th></tr></thead><tbody><tr><td>2026-02-02</td><td><span class="pill green">11%</span></td><td><span class="pill green">1%</span></td></tr><tr><td>2026-02-03</td><td><span class="pill green">12%</span></td><td><span class="pill green">0%</span></td></tr><tr><td>2026-02-04</td><td><span class="pill green">3%</span></td><td><span class="pill green">5%</span></td></tr><tr><td>2026-02-05</td><td><span class="pill green">12%</span></td><td><span class="pill orange">13%</span></td></tr><tr><td>2026-02-06</td><td><span class="pill green">12%</span></td><td><span class="pill orange">16%</span></td></tr><tr><td>2026-02-07</td><td><span class="pill orange">18%</span></td><td><span class="pill orange">13%</span></td></tr><tr><td>2026-02-08</td><td><span class="pill orange">20%</span></td><td><span class="pill green">10%</span></td></tr><tr><td>2026-02-09</td><td><span class="pill orange">17%</span></td><td><span class="pill orange">16%</span></td></tr><tr><td>2026-02-10</td><td><span class="pill red">29%</span></td><td><span class="pill orange">13%</span></td></tr><tr><td>2026-02-11</td><td><span class="pill orange">15%</span></td><td><span class="pill green">8%</span></td></tr><tr><td>2026-02-12</td><td><span class="pill green">14%</span></td><td><span class="pill orange">15%</span></td></tr><tr><td>2026-02-13</td><td><span class="pill orange">19%</span></td><td><span class="pill orange">14%</span></td></tr><tr><td>2026-02-14</td><td><span class="pill red">31%</span></td><td><span class="pill orange">13%</span></td></tr><tr><td>2026-02-15</td><td><span class="pill red">37%</span></td><td><span class="pill orange">18%</span></td></tr><tr><td>2026-02-16</td><td><span class="pill red">26%</span></td><td><span class="pill orange">13%</span></td></tr></tbody></table>
+    <div class="spark-container"><svg role="img" aria-label="Reliability sparkline: Pred ≤ suspend and Comm errors (14 days)" xmlns="http://www.w3.org/2000/svg" width="420" height="120" aria-label="Reliability sparkline"><style>text{font-family: 'Inter', system-ui, -apple-system, sans-serif;}</style><line x1="36" x2="406" y1="92" y2="92" stroke="#e0e0e0" stroke-width="1"/><path d="M36.0,68.4 L64.5,86.7 L92.9,68.4 L121.4,69.6 L149.8,56.9 L178.3,53.4 L206.8,59.4 L235.2,34.7 L263.7,62.6 L292.2,65.1 L320.6,54.4 L349.1,32.3 L377.5,20.4 L406.0,41.7" fill="none" stroke="#0d6efd" stroke-width="2" stroke-linecap="round"/><path d="M36.0,92.0 L64.5,82.1 L92.9,66.5 L121.4,60.8 L149.8,66.7 L178.3,72.7 L206.8,61.2 L235.2,66.3 L263.7,76.4 L292.2,62.9 L320.6,64.7 L349.1,67.6 L377.5,56.9 L406.0,67.2" fill="none" stroke="#f97316" stroke-width="2" stroke-linecap="round"/><text x="36" y="112" font-size="10" fill="#666">2026-02-03</text><text x="406" y="112" font-size="10" fill="#666" text-anchor="end">2026-02-16</text></svg><div class="spark-legend"><span class="pred">Pred ≤ suspend</span><span class="comm">Comm errors</span></div></div>
+  </details>
+ </div>
+</div>
+<div class="row">
+  <div class="card hypotheses-card">
+    <details>
+      <summary>Top Hypotheses (n=5)<span class="hyp-summary-meta">Click to expand table</span></summary>
+      <table><thead><tr><th>Title</th><th>Lever</th><th>Dir</th><th>Confidence</th></tr></thead><tbody><tr><td>Overnight downward drift suggests basal too strong</td><td>basal</td><td>too strong</td><td>Medium</td></tr><tr><td>Post-breakfast highs suggest ICR too weak</td><td>ICR</td><td>too weak</td><td>Medium</td></tr><tr><td>Post-lunch highs suggest ICR too weak</td><td>ICR</td><td>too weak</td><td>Medium</td></tr><tr><td>Post-dinner highs suggest ICR too weak</td><td>ICR</td><td>too weak</td><td>Medium</td></tr><tr><td>Corrections often ineffective → ISF may be too weak</td><td>ISF</td><td>too weak</td><td>Medium</td></tr></tbody></table>
+    </details>
+    <div class="hyp-summary-line">5 cards · Levers: basal, ICR, ISF</div>
+  </div>
+</div>
+<div class="card most-actionable"><strong>Most actionable</strong><div class="ma-list"><div class="ma-item"><span class="ma-card">Corrections: ISF ±10–20% — midday(11-13) | iob 0.5-1.5</span><span class="ma-arrow">→</span><span class="ma-option">ISF stronger ~20%</span><span class="risk-chip med" title="Risk gate: Pred ≤ suspend moderate / Max basal low">Med</span></div><div class="ma-item"><span class="ma-card">Corrections: ISF ±10–20% — midday(11-13) | iob&lt;0.5</span><span class="ma-arrow">→</span><span class="ma-option">ISF stronger ~20%</span><span class="risk-chip med" title="Risk gate: Pred ≤ suspend moderate / Max basal low">Med</span></div></div></div>
+<div class="row">
+ <div class="card"><h3>AGP (14‑day)</h3>
+  <?xml version="1.0"?><svg role="img" aria-label="AGP: daily median with 25–75% and 5–95% bands, target 70–180 mg/dL" viewBox="0 0 720 260" width="100%" height="260" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="#fff"/><line x1="40" y1="210.625" x2="710" y2="210.625" stroke="#eee"/><text x="32" y="214.625" text-anchor="end" font-size="10" fill="#666" font-family="system-ui,Arial">60</text><line x1="40" y1="183.875" x2="710" y2="183.875" stroke="#eee"/><text x="32" y="187.875" text-anchor="end" font-size="10" fill="#666" font-family="system-ui,Arial">100</text><line x1="40" y1="157.125" x2="710" y2="157.125" stroke="#eee"/><text x="32" y="161.125" text-anchor="end" font-size="10" fill="#666" font-family="system-ui,Arial">140</text><line x1="40" y1="130.375" x2="710" y2="130.375" stroke="#eee"/><text x="32" y="134.375" text-anchor="end" font-size="10" fill="#666" font-family="system-ui,Arial">180</text><line x1="40" y1="103.625" x2="710" y2="103.625" stroke="#eee"/><text x="32" y="107.625" text-anchor="end" font-size="10" fill="#666" font-family="system-ui,Arial">220</text><line x1="40" y1="76.875" x2="710" y2="76.875" stroke="#eee"/><text x="32" y="80.875" text-anchor="end" font-size="10" fill="#666" font-family="system-ui,Arial">260</text><line x1="40" y1="50.125" x2="710" y2="50.125" stroke="#eee"/><text x="32" y="54.125" text-anchor="end" font-size="10" fill="#666" font-family="system-ui,Arial">300</text><line x1="40" y1="23.375" x2="710" y2="23.375" stroke="#eee"/><text x="32" y="27.375" text-anchor="end" font-size="10" fill="#666" font-family="system-ui,Arial">340</text><line x1="208.0836236933798" y1="10" x2="208.0836236933798" y2="224" stroke="#eee"/><text x="208.0836236933798" y="238" text-anchor="middle" font-size="10" fill="#666" font-family="system-ui,Arial">6</text><line x1="292.1254355400697" y1="10" x2="292.1254355400697" y2="224" stroke="#eee"/><text x="292.1254355400697" y="238" text-anchor="middle" font-size="10" fill="#666" font-family="system-ui,Arial">9</text><line x1="376.1672473867596" y1="10" x2="376.1672473867596" y2="224" stroke="#eee"/><text x="376.1672473867596" y="238" text-anchor="middle" font-size="10" fill="#666" font-family="system-ui,Arial">12</text><line x1="460.20905923344947" y1="10" x2="460.20905923344947" y2="224" stroke="#eee"/><text x="460.20905923344947" y="238" text-anchor="middle" font-size="10" fill="#666" font-family="system-ui,Arial">15</text><line x1="544.2508710801394" y1="10" x2="544.2508710801394" y2="224" stroke="#eee"/><text x="544.2508710801394" y="238" text-anchor="middle" font-size="10" fill="#666" font-family="system-ui,Arial">18</text><line x1="628.2926829268292" y1="10" x2="628.2926829268292" y2="224" stroke="#eee"/><text x="628.2926829268292" y="238" text-anchor="middle" font-size="10" fill="#666" font-family="system-ui,Arial">21</text><rect x="40" y="130.375" width="670" height="73.5625" fill="rgba(39,174,96,0.07)"/><path d="M 40.00 62.16 L 42.33 62.90 L 44.67 64.84 L 47.00 56.81 L 49.34 56.14 L 51.67 66.01 L 54.01 71.39 L 56.34 74.87 L 58.68 64.17 L 61.01 70.86 L 63.34 73.87 L 65.68 74.30 L 68.01 75.67 L 70.35 71.19 L 72.68 67.18 L 75.02 66.04 L 77.35 65.64 L 79.69 61.96 L 82.02 68.58 L 84.36 68.52 L 86.69 65.24 L 89.02 59.65 L 91.36 66.17 L 93.69 65.61 L 96.03 67.51 L 98.36 70.19 L 100.70 71.19 L 103.03 71.86 L 105.37 70.32 L 107.70 77.38 L 110.03 83.96 L 112.37 53.47 L 114.70 90.22 L 117.04 71.09 L 119.37 80.89 L 121.71 82.56 L 124.04 63.50 L 126.38 88.18 L 128.71 85.44 L 131.05 84.63 L 133.38 95.93 L 135.71 100.65 L 138.05 96.77 L 140.38 99.61 L 142.72 96.44 L 145.05 95.53 L 147.39 105.36 L 149.72 114.19 L 152.06 113.02 L 154.39 119.01 L 156.72 108.24 L 159.06 93.59 L 161.39 112.02 L 163.73 120.34 L 166.06 121.65 L 168.40 121.35 L 170.73 121.68 L 173.07 126.26 L 175.40 125.49 L 177.74 130.78 L 180.07 113.66 L 182.40 127.70 L 184.74 130.04 L 187.07 127.97 L 189.41 126.06 L 191.74 119.67 L 194.08 122.02 L 196.41 126.36 L 198.75 132.72 L 201.08 137.10 L 203.41 134.39 L 205.75 136.80 L 208.08 142.41 L 210.42 146.06 L 212.75 147.76 L 215.09 148.97 L 217.42 156.46 L 219.76 150.77 L 222.09 155.79 L 224.43 152.44 L 226.76 148.43 L 229.09 157.53 L 231.43 163.14 L 233.76 163.14 L 236.10 167.96 L 238.43 162.34 L 240.77 147.76 L 243.10 152.01 L 245.44 162.74 L 247.77 159.80 L 250.10 159.67 L 252.44 145.76 L 254.77 139.07 L 257.11 117.54 L 259.44 106.30 L 261.78 85.50 L 264.11 66.17 L 266.45 65.51 L 268.78 63.20 L 271.11 55.84 L 273.45 56.88 L 275.78 44.11 L 278.12 37.42 L 280.45 38.09 L 282.79 41.67 L 285.12 34.68 L 287.46 28.73 L 289.79 27.49 L 292.13 23.71 L 294.46 10.00 L 296.79 37.59 L 299.13 29.53 L 301.46 38.76 L 303.80 43.84 L 306.13 26.72 L 308.47 58.28 L 310.80 61.49 L 313.14 58.08 L 315.47 64.84 L 317.80 71.66 L 320.14 70.32 L 322.47 70.46 L 324.81 77.88 L 327.14 71.12 L 329.48 70.19 L 331.81 62.50 L 334.15 58.82 L 336.48 64.57 L 338.82 51.33 L 341.15 66.71 L 343.48 70.32 L 345.82 70.39 L 348.15 79.52 L 350.49 87.01 L 352.82 70.19 L 355.16 90.25 L 357.49 91.45 L 359.83 97.61 L 362.16 88.58 L 364.49 88.58 L 366.83 87.17 L 369.16 76.21 L 371.50 71.12 L 373.83 74.37 L 376.17 52.13 L 378.50 83.53 L 380.84 75.04 L 383.17 65.37 L 385.51 64.90 L 387.84 63.10 L 390.17 53.47 L 392.51 43.44 L 394.84 57.88 L 397.18 61.43 L 399.51 58.15 L 401.85 64.30 L 404.18 61.29 L 406.52 51.80 L 408.85 51.46 L 411.18 41.10 L 413.52 37.42 L 415.85 34.74 L 418.19 32.60 L 420.52 35.18 L 422.86 23.38 L 425.19 24.04 L 427.53 18.56 L 429.86 11.34 L 432.20 28.12 L 434.53 30.90 L 436.86 37.35 L 439.20 34.08 L 441.53 48.62 L 443.87 55.48 L 446.20 50.73 L 448.54 46.61 L 450.87 65.37 L 453.21 70.69 L 455.54 79.75 L 457.87 80.62 L 460.21 85.23 L 462.54 92.79 L 464.88 91.59 L 467.21 89.58 L 469.55 94.06 L 471.88 98.61 L 474.22 92.26 L 476.55 90.68 L 478.89 81.22 L 481.22 86.51 L 483.55 94.80 L 485.89 62.16 L 488.22 78.05 L 490.56 63.50 L 492.89 94.60 L 495.23 87.17 L 497.56 64.84 L 499.90 77.34 L 502.23 78.21 L 504.56 73.06 L 506.90 78.25 L 509.23 78.01 L 511.57 77.04 L 513.90 70.05 L 516.24 54.14 L 518.57 66.38 L 520.91 52.13 L 523.24 67.85 L 525.57 54.81 L 527.91 60.16 L 530.24 64.50 L 532.58 62.83 L 534.91 60.69 L 537.25 57.48 L 539.58 66.71 L 541.92 75.54 L 544.25 72.06 L 546.59 60.16 L 548.92 60.86 L 551.25 55.31 L 553.59 56.71 L 555.92 67.55 L 558.26 66.51 L 560.59 66.51 L 562.93 81.69 L 565.26 52.13 L 567.60 37.29 L 569.93 43.14 L 572.26 61.63 L 574.60 30.06 L 576.93 56.68 L 579.27 68.18 L 581.60 59.72 L 583.94 48.89 L 586.27 47.99 L 588.61 64.17 L 590.94 67.25 L 593.28 65.21 L 595.61 45.54 L 597.94 77.54 L 600.28 45.88 L 602.61 50.29 L 604.95 38.76 L 607.28 39.42 L 609.62 21.37 L 611.95 11.34 L 614.29 25.11 L 616.62 23.64 L 618.95 11.34 L 621.29 68.58 L 623.62 76.27 L 625.96 80.49 L 628.29 54.81 L 630.63 60.96 L 632.96 59.49 L 635.30 61.16 L 637.63 53.80 L 639.97 53.10 L 642.30 46.51 L 644.63 34.74 L 646.97 32.74 L 649.30 47.05 L 651.64 54.00 L 653.97 52.67 L 656.31 53.47 L 658.64 53.94 L 660.98 55.81 L 663.31 43.44 L 665.64 43.07 L 667.98 47.18 L 670.31 47.75 L 672.65 46.11 L 674.98 48.32 L 677.32 45.74 L 679.65 51.80 L 681.99 50.39 L 684.32 45.44 L 686.66 45.44 L 688.99 34.74 L 691.32 38.09 L 693.66 53.47 L 695.99 54.47 L 698.33 42.77 L 700.66 47.18 L 703.00 47.12 L 705.33 45.44 L 707.67 53.40 L 710.00 58.79 L 710.00 197.82 L 707.67 201.86 L 705.33 201.70 L 703.00 221.99 L 700.66 202.33 L 698.33 193.37 L 695.99 198.25 L 693.66 192.70 L 691.32 189.76 L 688.99 195.24 L 686.66 194.58 L 684.32 193.81 L 681.99 184.68 L 679.65 178.39 L 677.32 179.49 L 674.98 172.51 L 672.65 167.83 L 670.31 176.52 L 667.98 175.85 L 665.64 168.93 L 663.31 171.50 L 660.98 171.17 L 658.64 175.18 L 656.31 167.16 L 653.97 173.17 L 651.64 171.37 L 649.30 179.86 L 646.97 183.84 L 644.63 189.22 L 642.30 183.11 L 639.97 185.21 L 637.63 189.22 L 635.30 184.68 L 632.96 190.83 L 630.63 195.71 L 628.29 191.90 L 625.96 187.65 L 623.62 189.56 L 621.29 192.03 L 618.95 180.30 L 616.62 182.67 L 614.29 182.67 L 611.95 174.91 L 609.62 173.48 L 607.28 177.52 L 604.95 171.97 L 602.61 168.49 L 600.28 166.49 L 597.94 177.19 L 595.61 181.47 L 593.28 186.58 L 590.94 187.35 L 588.61 191.90 L 586.27 198.32 L 583.94 207.28 L 581.60 205.94 L 579.27 199.26 L 576.93 200.59 L 574.60 200.33 L 572.26 193.10 L 569.93 191.90 L 567.60 186.55 L 565.26 180.20 L 562.93 173.71 L 560.59 166.82 L 558.26 160.80 L 555.92 160.64 L 553.59 169.10 L 551.25 176.89 L 548.92 179.59 L 546.59 182.07 L 544.25 186.78 L 541.92 213.30 L 539.58 181.97 L 537.25 194.17 L 534.91 188.36 L 532.58 193.50 L 530.24 196.92 L 527.91 206.41 L 525.57 212.50 L 523.24 206.28 L 520.91 202.73 L 518.57 198.05 L 516.24 202.60 L 513.90 197.95 L 511.57 205.28 L 509.23 199.46 L 506.90 196.05 L 504.56 192.54 L 502.23 185.48 L 499.90 182.94 L 497.56 186.28 L 495.23 192.30 L 492.89 200.93 L 490.56 202.30 L 488.22 202.67 L 485.89 202.60 L 483.55 199.79 L 481.22 198.32 L 478.89 198.86 L 476.55 203.27 L 474.22 203.94 L 471.88 193.91 L 469.55 203.27 L 467.21 191.67 L 464.88 204.61 L 462.54 188.29 L 460.21 187.89 L 457.87 182.54 L 455.54 195.24 L 453.21 176.22 L 450.87 176.79 L 448.54 185.21 L 446.20 184.74 L 443.87 183.21 L 441.53 209.96 L 439.20 209.96 L 436.86 212.63 L 434.53 185.85 L 432.20 215.31 L 429.86 169.83 L 427.53 123.02 L 425.19 205.28 L 422.86 201.93 L 420.52 193.91 L 418.19 162.64 L 415.85 157.13 L 413.52 181.87 L 411.18 154.12 L 408.85 166.49 L 406.52 143.08 L 404.18 138.10 L 401.85 136.56 L 399.51 138.73 L 397.18 132.85 L 394.84 138.67 L 392.51 155.25 L 390.17 156.99 L 387.84 155.79 L 385.51 158.40 L 383.17 163.14 L 380.84 160.27 L 378.50 176.65 L 376.17 189.29 L 373.83 194.91 L 371.50 192.30 L 369.16 189.22 L 366.83 191.23 L 364.49 172.84 L 362.16 162.81 L 359.83 162.47 L 357.49 161.81 L 355.16 157.43 L 352.82 158.06 L 350.49 159.77 L 348.15 163.81 L 345.82 161.57 L 343.48 164.48 L 341.15 166.75 L 338.82 167.29 L 336.48 165.69 L 334.15 171.57 L 331.81 170.83 L 329.48 168.83 L 327.14 170.00 L 324.81 175.98 L 322.47 181.20 L 320.14 182.54 L 317.80 189.22 L 315.47 188.56 L 313.14 195.24 L 310.80 195.91 L 308.47 189.63 L 306.13 186.55 L 303.80 186.18 L 301.46 184.68 L 299.13 185.08 L 296.79 188.56 L 294.46 177.69 L 292.13 181.20 L 289.79 182.37 L 287.46 181.94 L 285.12 186.55 L 282.79 187.89 L 280.45 189.56 L 278.12 187.05 L 275.78 184.88 L 273.45 184.01 L 271.11 181.77 L 268.78 188.56 L 266.45 183.34 L 264.11 180.46 L 261.78 183.21 L 259.44 190.90 L 257.11 195.64 L 254.77 196.58 L 252.44 198.72 L 250.10 201.26 L 247.77 202.20 L 245.44 202.33 L 243.10 201.60 L 240.77 201.23 L 238.43 196.58 L 236.10 191.10 L 233.76 190.56 L 231.43 190.90 L 229.09 189.89 L 226.76 191.26 L 224.43 189.56 L 222.09 193.04 L 219.76 188.89 L 217.42 191.47 L 215.09 190.16 L 212.75 191.57 L 210.42 196.58 L 208.08 189.22 L 205.75 192.84 L 203.41 191.16 L 201.08 190.93 L 198.75 195.91 L 196.41 195.24 L 194.08 188.89 L 191.74 189.56 L 189.41 187.22 L 187.07 193.50 L 184.74 190.56 L 182.40 189.22 L 180.07 186.18 L 177.74 184.01 L 175.40 186.88 L 173.07 186.02 L 170.73 187.89 L 168.40 189.89 L 166.06 185.68 L 163.73 186.22 L 161.39 183.11 L 159.06 180.20 L 156.72 179.26 L 154.39 190.83 L 152.06 205.94 L 149.72 211.29 L 147.39 178.56 L 145.05 179.66 L 142.72 178.86 L 140.38 177.52 L 138.05 177.76 L 135.71 179.80 L 133.38 177.19 L 131.05 178.53 L 128.71 174.78 L 126.38 179.86 L 124.04 174.51 L 121.71 169.83 L 119.37 170.83 L 117.04 171.44 L 114.70 185.21 L 112.37 170.10 L 110.03 176.52 L 107.70 171.70 L 105.37 171.17 L 103.03 168.83 L 100.70 168.83 L 98.36 170.17 L 96.03 170.50 L 93.69 170.53 L 91.36 168.49 L 89.02 173.17 L 86.69 170.30 L 84.36 166.49 L 82.02 165.02 L 79.69 173.17 L 77.35 175.85 L 75.02 170.93 L 72.68 177.19 L 70.35 178.53 L 68.01 180.80 L 65.68 179.53 L 63.34 183.54 L 61.01 191.23 L 58.68 190.16 L 56.34 208.62 L 54.01 193.54 L 51.67 197.99 L 49.34 199.79 L 47.00 198.99 L 44.67 215.97 L 42.33 201.70 L 40.00 199.92 Z" fill="rgba(231,76,60,0.06)" stroke="none"/><path d="M 40.00 84.23 L 42.33 87.07 L 44.67 88.91 L 47.00 92.92 L 49.34 92.09 L 51.67 92.92 L 54.01 100.62 L 56.34 101.62 L 58.68 83.56 L 61.01 85.57 L 63.34 87.58 L 65.68 91.59 L 68.01 90.25 L 70.35 92.92 L 72.68 97.27 L 75.02 100.11 L 77.35 98.94 L 79.69 96.94 L 82.02 109.64 L 84.36 90.92 L 86.69 99.61 L 89.02 111.65 L 91.36 104.29 L 93.69 101.45 L 96.03 113.32 L 98.36 105.30 L 100.70 107.64 L 103.03 109.64 L 105.37 113.66 L 107.70 119.84 L 110.03 114.33 L 112.37 113.82 L 114.70 115.66 L 117.04 115.66 L 119.37 116.33 L 121.71 128.70 L 124.04 118.34 L 126.38 117.00 L 128.71 117.00 L 131.05 116.33 L 133.38 129.37 L 135.71 136.90 L 138.05 131.21 L 140.38 127.70 L 142.72 124.36 L 145.05 125.02 L 147.39 128.37 L 149.72 133.72 L 152.06 137.06 L 154.39 135.73 L 156.72 137.06 L 159.06 137.06 L 161.39 139.07 L 163.73 144.42 L 166.06 145.09 L 168.40 145.76 L 170.73 149.10 L 173.07 149.77 L 175.40 151.27 L 177.74 154.45 L 180.07 151.44 L 182.40 153.11 L 184.74 154.45 L 187.07 154.45 L 189.41 153.11 L 191.74 153.78 L 194.08 153.11 L 196.41 154.45 L 198.75 154.45 L 201.08 154.62 L 203.41 152.44 L 205.75 152.44 L 208.08 156.46 L 210.42 158.80 L 212.75 161.14 L 215.09 164.82 L 217.42 165.82 L 219.76 166.82 L 222.09 167.16 L 224.43 162.47 L 226.76 164.48 L 229.09 166.49 L 231.43 169.50 L 233.76 173.01 L 236.10 174.51 L 238.43 175.18 L 240.77 175.18 L 243.10 174.51 L 245.44 177.86 L 247.77 169.83 L 250.10 171.17 L 252.44 153.78 L 254.77 154.45 L 257.11 161.81 L 259.44 141.74 L 261.78 143.75 L 264.11 123.52 L 266.45 119.01 L 268.78 119.01 L 271.11 96.27 L 273.45 97.61 L 275.78 90.25 L 278.12 90.42 L 280.45 86.24 L 282.79 86.24 L 285.12 88.91 L 287.46 91.59 L 289.79 94.26 L 292.13 103.63 L 294.46 103.63 L 296.79 96.27 L 299.13 97.61 L 301.46 88.58 L 303.80 85.40 L 306.13 82.56 L 308.47 87.58 L 310.80 89.58 L 313.14 89.25 L 315.47 98.27 L 317.80 92.92 L 320.14 89.58 L 322.47 95.43 L 324.81 96.27 L 327.14 96.27 L 329.48 99.28 L 331.81 97.94 L 334.15 101.62 L 336.48 100.28 L 338.82 98.94 L 341.15 98.94 L 343.48 102.96 L 345.82 109.14 L 348.15 117.50 L 350.49 116.50 L 352.82 119.01 L 355.16 122.35 L 357.49 121.68 L 359.83 127.70 L 362.16 118.67 L 364.49 107.64 L 366.83 121.68 L 369.16 119.01 L 371.50 118.34 L 373.83 125.86 L 376.17 124.36 L 378.50 121.35 L 380.84 114.33 L 383.17 102.29 L 385.51 85.74 L 387.84 84.90 L 390.17 89.75 L 392.51 94.26 L 394.84 90.25 L 397.18 92.59 L 399.51 88.24 L 401.85 80.89 L 404.18 77.04 L 406.52 71.53 L 408.85 58.15 L 411.18 68.52 L 413.52 55.48 L 415.85 61.16 L 418.19 55.14 L 420.52 53.47 L 422.86 48.79 L 425.19 55.14 L 427.53 48.79 L 429.86 58.82 L 432.20 58.82 L 434.53 58.82 L 436.86 63.50 L 439.20 70.86 L 441.53 74.20 L 443.87 80.22 L 446.20 96.27 L 448.54 101.62 L 450.87 96.94 L 453.21 111.65 L 455.54 111.32 L 457.87 110.98 L 460.21 119.01 L 462.54 111.65 L 464.88 106.30 L 467.21 119.67 L 469.55 124.36 L 471.88 110.31 L 474.22 104.96 L 476.55 105.30 L 478.89 106.63 L 481.22 121.01 L 483.55 121.68 L 485.89 110.98 L 488.22 114.99 L 490.56 116.16 L 492.89 126.03 L 495.23 131.04 L 497.56 134.39 L 499.90 135.73 L 502.23 123.02 L 504.56 123.02 L 506.90 127.03 L 509.23 122.35 L 511.57 131.21 L 513.90 126.86 L 516.24 133.89 L 518.57 143.08 L 520.91 114.99 L 523.24 94.93 L 525.57 93.76 L 527.91 86.24 L 530.24 86.24 L 532.58 92.92 L 534.91 120.34 L 537.25 118.34 L 539.58 114.33 L 541.92 84.90 L 544.25 98.27 L 546.59 97.77 L 548.92 113.49 L 551.25 111.65 L 553.59 116.33 L 555.92 125.02 L 558.26 123.02 L 560.59 124.69 L 562.93 120.34 L 565.26 113.66 L 567.60 114.99 L 569.93 107.30 L 572.26 103.63 L 574.60 98.27 L 576.93 100.95 L 579.27 104.29 L 581.60 101.62 L 583.94 96.94 L 586.27 81.56 L 588.61 102.29 L 590.94 94.93 L 593.28 102.96 L 595.61 103.63 L 597.94 107.97 L 600.28 114.33 L 602.61 87.24 L 604.95 94.93 L 607.28 105.63 L 609.62 85.57 L 611.95 105.63 L 614.29 111.65 L 616.62 114.99 L 618.95 114.33 L 621.29 121.68 L 623.62 124.36 L 625.96 108.14 L 628.29 96.94 L 630.63 85.07 L 632.96 78.88 L 635.30 80.39 L 637.63 80.89 L 639.97 87.58 L 642.30 78.21 L 644.63 108.98 L 646.97 84.23 L 649.30 103.63 L 651.64 72.86 L 653.97 86.24 L 656.31 88.91 L 658.64 101.28 L 660.98 100.28 L 663.31 88.24 L 665.64 77.54 L 667.98 73.53 L 670.31 77.54 L 672.65 96.27 L 674.98 82.56 L 677.32 71.53 L 679.65 74.87 L 681.99 77.54 L 684.32 82.23 L 686.66 81.56 L 688.99 76.88 L 691.32 76.21 L 693.66 75.54 L 695.99 74.53 L 698.33 76.21 L 700.66 78.21 L 703.00 84.23 L 705.33 88.91 L 707.67 89.08 L 710.00 84.90 L 710.00 151.11 L 707.67 149.77 L 705.33 151.78 L 703.00 153.11 L 700.66 151.11 L 698.33 136.39 L 695.99 147.76 L 693.66 147.76 L 691.32 147.76 L 688.99 143.42 L 686.66 151.11 L 684.32 147.26 L 681.99 155.12 L 679.65 155.12 L 677.32 152.44 L 674.98 146.59 L 672.65 149.10 L 670.31 154.62 L 667.98 141.08 L 665.64 137.90 L 663.31 142.41 L 660.98 143.08 L 658.64 149.10 L 656.31 146.42 L 653.97 153.11 L 651.64 153.11 L 649.30 168.33 L 646.97 177.19 L 644.63 177.86 L 642.30 169.33 L 639.97 173.01 L 637.63 153.78 L 635.30 151.78 L 632.96 151.78 L 630.63 145.92 L 628.29 145.76 L 625.96 145.25 L 623.62 148.43 L 621.29 150.77 L 618.95 137.06 L 616.62 137.73 L 614.29 139.74 L 611.95 139.07 L 609.62 147.09 L 607.28 151.11 L 604.95 154.45 L 602.61 156.46 L 600.28 155.62 L 597.94 156.46 L 595.61 151.78 L 593.28 153.78 L 590.94 167.32 L 588.61 160.47 L 586.27 159.13 L 583.94 162.47 L 581.60 161.14 L 579.27 161.81 L 576.93 147.09 L 574.60 138.40 L 572.26 143.75 L 569.93 142.41 L 567.60 146.42 L 565.26 154.45 L 562.93 153.78 L 560.59 154.45 L 558.26 149.10 L 555.92 143.42 L 553.59 143.08 L 551.25 150.10 L 548.92 149.94 L 546.59 139.57 L 544.25 151.78 L 541.92 153.28 L 539.58 148.43 L 537.25 153.78 L 534.91 157.79 L 532.58 163.81 L 530.24 170.83 L 527.91 179.19 L 525.57 170.33 L 523.24 177.86 L 520.91 179.19 L 518.57 171.17 L 516.24 171.84 L 513.90 166.82 L 511.57 179.53 L 509.23 178.53 L 506.90 176.02 L 504.56 177.19 L 502.23 175.85 L 499.90 177.02 L 497.56 175.18 L 495.23 175.85 L 492.89 170.50 L 490.56 171.34 L 488.22 180.87 L 485.89 177.35 L 483.55 182.54 L 481.22 177.86 L 478.89 178.86 L 476.55 171.17 L 474.22 161.81 L 471.88 165.15 L 469.55 159.30 L 467.21 156.46 L 464.88 151.11 L 462.54 150.44 L 460.21 151.44 L 457.87 153.11 L 455.54 158.80 L 453.21 153.78 L 450.87 161.81 L 448.54 163.14 L 446.20 164.48 L 443.87 146.76 L 441.53 143.75 L 439.20 131.04 L 436.86 132.21 L 434.53 114.33 L 432.20 108.31 L 429.86 101.28 L 427.53 98.27 L 425.19 106.30 L 422.86 97.61 L 420.52 100.95 L 418.19 98.27 L 415.85 100.28 L 413.52 105.63 L 411.18 100.28 L 408.85 108.14 L 406.52 109.64 L 404.18 106.30 L 401.85 116.33 L 399.51 114.99 L 397.18 118.34 L 394.84 114.33 L 392.51 123.02 L 390.17 126.36 L 387.84 131.71 L 385.51 135.06 L 383.17 126.36 L 380.84 157.79 L 378.50 163.81 L 376.17 155.45 L 373.83 158.63 L 371.50 158.46 L 369.16 151.44 L 366.83 150.44 L 364.49 144.42 L 362.16 145.09 L 359.83 144.42 L 357.49 152.44 L 355.16 148.60 L 352.82 149.10 L 350.49 151.11 L 348.15 149.77 L 345.82 148.43 L 343.48 150.44 L 341.15 152.44 L 338.82 151.78 L 336.48 149.77 L 334.15 147.09 L 331.81 146.42 L 329.48 146.42 L 327.14 147.09 L 324.81 145.09 L 322.47 135.73 L 320.14 132.38 L 317.80 136.23 L 315.47 130.38 L 313.14 133.72 L 310.80 130.04 L 308.47 138.40 L 306.13 136.39 L 303.80 135.73 L 301.46 134.55 L 299.13 132.38 L 296.79 133.05 L 294.46 133.72 L 292.13 135.39 L 289.79 139.07 L 287.46 138.73 L 285.12 150.60 L 282.79 155.12 L 280.45 161.14 L 278.12 161.14 L 275.78 156.96 L 273.45 165.15 L 271.11 165.15 L 268.78 169.16 L 266.45 174.51 L 264.11 169.16 L 261.78 172.51 L 259.44 176.52 L 257.11 179.86 L 254.77 181.20 L 252.44 175.85 L 250.10 185.21 L 247.77 190.56 L 245.44 194.58 L 243.10 189.06 L 240.77 185.21 L 238.43 186.55 L 236.10 188.89 L 233.76 186.55 L 231.43 184.54 L 229.09 182.54 L 226.76 183.88 L 224.43 179.19 L 222.09 181.20 L 219.76 179.86 L 217.42 182.20 L 215.09 179.36 L 212.75 178.53 L 210.42 180.20 L 208.08 179.86 L 205.75 178.53 L 203.41 183.21 L 201.08 178.02 L 198.75 176.52 L 196.41 176.52 L 194.08 173.17 L 191.74 174.51 L 189.41 171.67 L 187.07 177.19 L 184.74 180.53 L 182.40 182.20 L 180.07 175.35 L 177.74 171.84 L 175.40 175.85 L 173.07 176.52 L 170.73 175.18 L 168.40 174.51 L 166.06 172.34 L 163.73 172.17 L 161.39 172.51 L 159.06 175.18 L 156.72 171.17 L 154.39 172.84 L 152.06 173.84 L 149.72 172.51 L 147.39 173.84 L 145.05 172.51 L 142.72 171.17 L 140.38 171.17 L 138.05 171.17 L 135.71 171.50 L 133.38 167.83 L 131.05 168.49 L 128.71 168.49 L 126.38 167.16 L 124.04 165.15 L 121.71 163.81 L 119.37 163.14 L 117.04 159.13 L 114.70 161.64 L 112.37 160.47 L 110.03 162.47 L 107.70 160.47 L 105.37 159.13 L 103.03 155.12 L 100.70 153.78 L 98.36 151.44 L 96.03 152.44 L 93.69 154.45 L 91.36 153.11 L 89.02 152.61 L 86.69 149.60 L 84.36 147.76 L 82.02 147.09 L 79.69 157.46 L 77.35 145.76 L 75.02 145.76 L 72.68 146.42 L 70.35 142.41 L 68.01 145.09 L 65.68 147.09 L 63.34 150.44 L 61.01 150.44 L 58.68 145.09 L 56.34 147.09 L 54.01 149.27 L 51.67 152.44 L 49.34 147.26 L 47.00 147.76 L 44.67 153.11 L 42.33 147.93 L 40.00 148.43 Z" fill="rgba(230,126,34,0.22)" stroke="none"/><path d="M 40.00 109.64 L 42.33 119.34 L 44.67 129.04 L 47.00 119.01 L 49.34 109.98 L 51.67 112.32 L 54.01 110.31 L 56.34 115.66 L 58.68 127.70 L 61.01 119.67 L 63.34 119.67 L 65.68 121.68 L 68.01 120.34 L 70.35 121.01 L 72.68 121.01 L 75.02 123.02 L 77.35 114.99 L 79.69 125.02 L 82.02 117.00 L 84.36 125.69 L 86.69 138.40 L 89.02 141.08 L 91.36 141.08 L 93.69 133.72 L 96.03 137.73 L 98.36 134.39 L 100.70 145.09 L 103.03 141.74 L 105.37 149.10 L 107.70 140.41 L 110.03 138.40 L 112.37 145.76 L 114.70 144.42 L 117.04 145.76 L 119.37 156.46 L 121.71 155.12 L 124.04 157.13 L 126.38 154.45 L 128.71 153.11 L 131.05 149.10 L 133.38 152.44 L 135.71 153.78 L 138.05 154.45 L 140.38 153.11 L 142.72 151.44 L 145.05 149.10 L 147.39 150.44 L 149.72 151.11 L 152.06 151.11 L 154.39 151.11 L 156.72 148.77 L 159.06 151.11 L 161.39 155.12 L 163.73 153.11 L 166.06 153.78 L 168.40 149.77 L 170.73 155.79 L 173.07 155.79 L 175.40 160.47 L 177.74 156.46 L 180.07 156.46 L 182.40 161.14 L 184.74 161.81 L 187.07 160.47 L 189.41 158.13 L 191.74 161.14 L 194.08 161.81 L 196.41 163.81 L 198.75 166.49 L 201.08 166.82 L 203.41 166.15 L 205.75 169.83 L 208.08 172.51 L 210.42 172.51 L 212.75 172.51 L 215.09 168.49 L 217.42 170.50 L 219.76 169.83 L 222.09 173.84 L 224.43 173.84 L 226.76 176.52 L 229.09 177.86 L 231.43 179.19 L 233.76 177.52 L 236.10 180.53 L 238.43 180.53 L 240.77 182.20 L 243.10 185.88 L 245.44 179.86 L 247.77 175.85 L 250.10 175.18 L 252.44 168.49 L 254.77 166.82 L 257.11 165.82 L 259.44 158.46 L 261.78 161.14 L 264.11 152.44 L 266.45 160.47 L 268.78 152.44 L 271.11 125.69 L 273.45 144.42 L 275.78 124.36 L 278.12 126.70 L 280.45 120.34 L 282.79 127.70 L 285.12 123.02 L 287.46 119.01 L 289.79 114.66 L 292.13 115.66 L 294.46 122.35 L 296.79 119.67 L 299.13 115.66 L 301.46 118.67 L 303.80 118.34 L 306.13 111.65 L 308.47 113.66 L 310.80 117.67 L 313.14 117.33 L 315.47 117.67 L 317.80 122.35 L 320.14 121.01 L 322.47 113.99 L 324.81 114.99 L 327.14 137.06 L 329.48 133.72 L 331.81 136.39 L 334.15 129.04 L 336.48 117.67 L 338.82 123.02 L 341.15 114.33 L 343.48 117.67 L 345.82 122.35 L 348.15 128.03 L 350.49 133.05 L 352.82 129.71 L 355.16 132.38 L 357.49 135.06 L 359.83 136.39 L 362.16 125.69 L 364.49 128.37 L 366.83 134.39 L 369.16 136.39 L 371.50 140.41 L 373.83 148.43 L 376.17 136.39 L 378.50 131.38 L 380.84 118.34 L 383.17 119.67 L 385.51 109.64 L 387.84 110.31 L 390.17 112.32 L 392.51 107.64 L 394.84 106.97 L 397.18 105.63 L 399.51 101.62 L 401.85 102.29 L 404.18 101.62 L 406.52 97.61 L 408.85 90.25 L 411.18 91.59 L 413.52 88.24 L 415.85 80.22 L 418.19 79.55 L 420.52 85.57 L 422.86 85.90 L 425.19 85.57 L 427.53 88.24 L 429.86 93.59 L 432.20 98.27 L 434.53 94.60 L 436.86 99.61 L 439.20 98.27 L 441.53 96.94 L 443.87 98.94 L 446.20 119.01 L 448.54 116.33 L 450.87 118.34 L 453.21 127.70 L 455.54 132.38 L 457.87 133.72 L 460.21 133.05 L 462.54 131.71 L 464.88 133.05 L 467.21 134.72 L 469.55 144.42 L 471.88 142.41 L 474.22 139.07 L 476.55 133.38 L 478.89 135.06 L 481.22 139.07 L 483.55 131.71 L 485.89 133.38 L 488.22 132.38 L 490.56 131.04 L 492.89 138.40 L 495.23 145.76 L 497.56 143.08 L 499.90 153.78 L 502.23 146.42 L 504.56 157.13 L 506.90 159.80 L 509.23 151.11 L 511.57 157.13 L 513.90 155.12 L 516.24 155.12 L 518.57 159.13 L 520.91 153.11 L 523.24 155.79 L 525.57 148.43 L 527.91 147.76 L 530.24 153.78 L 532.58 156.46 L 534.91 145.76 L 537.25 145.76 L 539.58 138.40 L 541.92 133.72 L 544.25 127.70 L 546.59 126.03 L 548.92 129.71 L 551.25 135.73 L 553.59 133.72 L 555.92 135.06 L 558.26 141.08 L 560.59 142.41 L 562.93 138.40 L 565.26 139.07 L 567.60 127.70 L 569.93 119.67 L 572.26 115.66 L 574.60 117.67 L 576.93 125.02 L 579.27 119.67 L 581.60 126.36 L 583.94 139.07 L 586.27 120.34 L 588.61 148.43 L 590.94 148.43 L 593.28 139.07 L 595.61 142.08 L 597.94 135.06 L 600.28 127.70 L 602.61 124.69 L 604.95 126.03 L 607.28 123.02 L 609.62 119.01 L 611.95 117.00 L 614.29 117.00 L 616.62 124.36 L 618.95 130.71 L 621.29 133.05 L 623.62 129.71 L 625.96 126.36 L 628.29 133.05 L 630.63 129.04 L 632.96 136.39 L 635.30 122.35 L 637.63 129.71 L 639.97 136.39 L 642.30 122.35 L 644.63 125.69 L 646.97 123.69 L 649.30 135.73 L 651.64 131.71 L 653.97 139.07 L 656.31 121.68 L 658.64 134.39 L 660.98 127.03 L 663.31 136.39 L 665.64 129.04 L 667.98 131.04 L 670.31 128.37 L 672.65 122.35 L 674.98 125.36 L 677.32 124.69 L 679.65 120.34 L 681.99 121.68 L 684.32 125.69 L 686.66 128.37 L 688.99 106.97 L 691.32 96.27 L 693.66 133.05 L 695.99 94.93 L 698.33 94.93 L 700.66 119.01 L 703.00 104.63 L 705.33 102.96 L 707.67 103.63 L 710.00 111.32" fill="none" stroke="#2c3e50" stroke-width="2"/></svg>
+  <div class="muted">Shaded bands: 25–75% (inner) and 5–95% (outer). Target band: 70–180 mg/dL.</div>
+  <div class="heatmap-interpretation">
+    <h4>How to read</h4>
+    <ul>
+      <li>Dark line = median; inner band = 25–75%; outer band = 5–95%.</li>
+      <li>Green zone marks 70–180 mg/dL target.</li>
+      <li>Look for repeat median excursions and wide bands (variability).</li>
+    </ul>
+    <h4>Key takeaways (auto‑generated)</h4>
+    <ul id="agp-takeaways"><li>Midday (11–13) median ~190 mg/dL — post‑lunch elevation; lunch timing/ICR</li></ul>
+  </div>
+ </div>
+ <div class="card"><h3>GRI components</h3>
+  <?xml version="1.0"?><svg role="img" aria-label="Hourly risk: LBGI (hypo, purple) and HBGI (hyper, orange)" viewBox="0 0 720 220" width="100%" height="220" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="#fff"/><line x1="36" y1="196" x2="708" y2="196" stroke="#eee"/><text x="28" y="199" text-anchor="end" font-size="10" fill="#666" font-family="system-ui,Arial">0</text><line x1="36" y1="136" x2="708" y2="136" stroke="#eee"/><text x="28" y="139" text-anchor="end" font-size="10" fill="#666" font-family="system-ui,Arial">10</text><line x1="36" y1="76" x2="708" y2="76" stroke="#eee"/><text x="28" y="79" text-anchor="end" font-size="10" fill="#666" font-family="system-ui,Arial">20</text><line x1="36" y1="16" x2="708" y2="16" stroke="#eee"/><text x="28" y="19" text-anchor="end" font-size="10" fill="#666" font-family="system-ui,Arial">30</text><rect x="40.0" y="107.6" width="20.0" height="82.4" fill="#e67e22"/><rect x="40.0" y="70.9" width="20.0" height="36.7" fill="#8e44ad"/><rect x="68.0" y="123.2" width="20.0" height="66.8" fill="#e67e22"/><rect x="68.0" y="122.7" width="20.0" height="0.5" fill="#8e44ad"/><rect x="96.0" y="144.5" width="20.0" height="45.5" fill="#e67e22"/><rect x="96.0" y="142.6" width="20.0" height="1.9" fill="#8e44ad"/><rect x="124.0" y="157.4" width="20.0" height="32.6" fill="#e67e22"/><rect x="124.0" y="148.3" width="20.0" height="9.1" fill="#8e44ad"/><rect x="152.0" y="166.1" width="20.0" height="23.9" fill="#e67e22"/><rect x="152.0" y="160.1" width="20.0" height="6.0" fill="#8e44ad"/><rect x="180.0" y="173.6" width="20.0" height="16.4" fill="#e67e22"/><rect x="180.0" y="168.3" width="20.0" height="5.3" fill="#8e44ad"/><rect x="208.0" y="184.0" width="20.0" height="6.0" fill="#e67e22"/><rect x="208.0" y="179.7" width="20.0" height="4.2" fill="#8e44ad"/><rect x="236.0" y="175.8" width="20.0" height="14.2" fill="#e67e22"/><rect x="236.0" y="165.3" width="20.0" height="10.5" fill="#8e44ad"/><rect x="264.0" y="109.2" width="20.0" height="80.8" fill="#e67e22"/><rect x="264.0" y="106.0" width="20.0" height="3.2" fill="#8e44ad"/><rect x="292.0" y="95.5" width="20.0" height="94.5" fill="#e67e22"/><rect x="292.0" y="89.9" width="20.0" height="5.6" fill="#8e44ad"/><rect x="320.0" y="120.8" width="20.0" height="69.2" fill="#e67e22"/><rect x="320.0" y="119.7" width="20.0" height="1.1" fill="#8e44ad"/><rect x="348.0" y="139.9" width="20.0" height="50.1" fill="#e67e22"/><rect x="348.0" y="129.1" width="20.0" height="10.8" fill="#8e44ad"/><rect x="376.0" y="108.6" width="20.0" height="81.4" fill="#e67e22"/><rect x="376.0" y="103.1" width="20.0" height="5.5" fill="#8e44ad"/><rect x="404.0" y="52.3" width="20.0" height="137.7" fill="#e67e22"/><rect x="404.0" y="21.5" width="20.0" height="30.8" fill="#8e44ad"/><rect x="432.0" y="98.5" width="20.0" height="91.5" fill="#e67e22"/><rect x="432.0" y="49.1" width="20.0" height="49.4" fill="#8e44ad"/><rect x="460.0" y="132.7" width="20.0" height="57.3" fill="#e67e22"/><rect x="460.0" y="112.6" width="20.0" height="20.1" fill="#8e44ad"/><rect x="488.0" y="137.6" width="20.0" height="52.4" fill="#e67e22"/><rect x="488.0" y="124.5" width="20.0" height="13.2" fill="#8e44ad"/><rect x="516.0" y="131.7" width="20.0" height="58.3" fill="#e67e22"/><rect x="516.0" y="86.2" width="20.0" height="45.6" fill="#8e44ad"/><rect x="544.0" y="128.2" width="20.0" height="61.8" fill="#e67e22"/><rect x="544.0" y="120.2" width="20.0" height="8.0" fill="#8e44ad"/><rect x="572.0" y="118.9" width="20.0" height="71.1" fill="#e67e22"/><rect x="572.0" y="95.3" width="20.0" height="23.6" fill="#8e44ad"/><rect x="600.0" y="115.7" width="20.0" height="74.3" fill="#e67e22"/><rect x="600.0" y="92.9" width="20.0" height="22.8" fill="#8e44ad"/><rect x="628.0" y="104.6" width="20.0" height="85.4" fill="#e67e22"/><rect x="628.0" y="99.2" width="20.0" height="5.4" fill="#8e44ad"/><rect x="656.0" y="109.7" width="20.0" height="80.3" fill="#e67e22"/><rect x="656.0" y="102.4" width="20.0" height="7.3" fill="#8e44ad"/><rect x="684.0" y="92.0" width="20.0" height="98.0" fill="#e67e22"/><rect x="684.0" y="33.3" width="20.0" height="58.6" fill="#8e44ad"/><text x="36" y="214" font-size="10" fill="#666" font-family="system-ui,Arial">0</text><text x="120" y="214" font-size="10" fill="#666" font-family="system-ui,Arial">3</text><text x="204" y="214" font-size="10" fill="#666" font-family="system-ui,Arial">6</text><text x="288" y="214" font-size="10" fill="#666" font-family="system-ui,Arial">9</text><text x="372" y="214" font-size="10" fill="#666" font-family="system-ui,Arial">12</text><text x="456" y="214" font-size="10" fill="#666" font-family="system-ui,Arial">15</text><text x="540" y="214" font-size="10" fill="#666" font-family="system-ui,Arial">18</text><text x="624" y="214" font-size="10" fill="#666" font-family="system-ui,Arial">21</text><text x="710" y="16" text-anchor="end" font-size="10" fill="#666" font-family="system-ui,Arial">LBGI (purple) + HBGI (orange) by hour</text></svg>
+  <div class="muted">Purple = LBGI (hypo risk), Orange = HBGI (hyper risk).</div>
+ </div>
+</div>
+<div class="row">
+ <div class="card"><h3>School Meal Lens</h3>
+  <table><thead><tr><th>Window</th><th>Lead bin</th><th>n</th><th>Start BG (med/IQR)</th><th>ΔPeak (med)</th><th>T→180 (med)</th><th>Start trend</th><th>%>180</th><th>Median peak</th></tr></thead><tbody><tr><td>Breakfast 7:00–8:00</td><td>pre&gt;=20</td><td>4</td><td>96.5/7</td><td>149</td><td>2m</td><td>flat (50%)</td><td>100%</td><td>247</td></tr><tr><td>Breakfast 7:00–8:00</td><td>pre0-4</td><td>4</td><td>141.5/48</td><td>104.5</td><td>3m</td><td>rising (67%)</td><td>100%</td><td>239.5</td></tr><tr><td>Breakfast 7:00–8:00</td><td>post0-9</td><td>1</td><td>92/0</td><td>139</td><td>2m</td><td>flat (100%)</td><td>100%</td><td>231</td></tr><tr><td>Breakfast 7:00–8:00</td><td>post&gt;=20</td><td>1</td><td>72/0</td><td>291</td><td>2m</td><td>flat (100%)</td><td>100%</td><td>363</td></tr><tr><td>Lunch 11:20–12:10</td><td>pre0-4</td><td>1</td><td>251/0</td><td>84</td><td>&gt;4h</td><td>falling (100%)</td><td>100%</td><td>335</td></tr></tbody></table>
+  <div class="muted">T→180 = return to 180 mg/dL after first >180 crossing within 4h. “≤180” = never >180; “>4h” = no return within 4h.</div>
+  <div class="heatmap-interpretation">
+    <h4>How to read</h4>
+    <ul>
+      <li>Lead bin: dosing timing relative to meal (e.g., pre≥20, pre0–4, post).</li>
+      <li>ΔPeak: median peak minus start; lower is better if peaks are excessive.</li>
+      <li>T→180: time to return ≤180 after first >180 within 4h.</li>
+    </ul>
+    <h4>Key takeaways (auto‑generated)</h4>
+    <ul id="meals-takeaways"><li>Breakfast: 92% &gt;180; median peak ~247</li><li>Lunch: 93% &gt;180; median peak ~295</li><li>Dinner: 95% &gt;180; median peak ~267</li></ul>
+  </div>
+ </div>
+</div>
+<div class="row">
+  <div class="card dinner-card"><h3>Dinner Lens</h3>
+    <table><thead><tr><th>Window</th><th>Lead bin</th><th>n</th><th>Start BG (med/IQR)</th><th>ΔPeak (med)</th><th>T→180 (med)</th><th>Start trend</th><th>%>180</th><th>Median peak</th></tr></thead><tbody><tr><td>Dinner 17:30–20:00</td><td>pre&gt;=20</td><td>15</td><td>175/85</td><td>71</td><td>4m</td><td>flat (53%)</td><td>93.3%</td><td>258</td></tr><tr><td>Dinner 17:30–20:00</td><td>pre10-19</td><td>4</td><td>169/31</td><td>60</td><td>11m</td><td>rising (33%)</td><td>100%</td><td>262.5</td></tr><tr><td>Dinner 17:30–20:00</td><td>pre5-9</td><td>6</td><td>220.5/104</td><td>61.5</td><td>73m</td><td>rising (50%)</td><td>100%</td><td>326.5</td></tr><tr><td>Dinner 17:30–20:00</td><td>pre0-4</td><td>9</td><td>185/109</td><td>82</td><td>4m</td><td>rising (78%)</td><td>88.9%</td><td>273</td></tr><tr><td>Dinner 17:30–20:00</td><td>post0-9</td><td>4</td><td>130/55</td><td>128</td><td>23m</td><td>flat (100%)</td><td>100%</td><td>244.5</td></tr><tr><td>Dinner 17:30–20:00</td><td>none(-60..+30)</td><td>1</td><td>55/0</td><td>283</td><td>5m</td><td>flat (100%)</td><td>100%</td><td>338</td></tr></tbody></table>
+    <div class="muted">Window fixed at 17:30–20:00; requires logged carbs ≥10g and bolus within −60/+30 min.</div>
+    <div class="heatmap-interpretation">
+      <h4>How to read</h4>
+      <ul>
+        <li>Compare lead bins (pre≥20, pre10–19, pre0–4, post) to see which timing trims peaks fastest.</li>
+        <li>ΔPeak: peak − start BG; lower suggests better coverage.</li>
+        <li>T→180: median minutes to return ≤180; “>4h” = never returned inside the 4h window.</li>
+      </ul>
+      <h4>Key takeaways (auto‑generated)</h4>
+      <ul id="dinner-takeaways"><li>Dinner sample n=39; weighted %&gt;180 ≈95%.</li><li>post0-9 dosing shows the lowest median peak (~245 mg/dL).</li><li>Return to 180 takes ~73m when pre5-9 (n=6).</li><li>Starts highest (~221 mg/dL) when pre5-9; target temp before dinner if looping late.</li></ul>
+    </div>
+  </div>
+</div>
+<div class="row">
+  <div class="card experiments-card">
+    <h3>Experiments v1</h3>
+    <div class="experiments-stamp">Updated Feb 16, 05:54 PM</div>
+    <div class="exp-columns">
+      <div class="exp-column">
+        <h4>Active</h4>
+        <ul><li><div class="exp-item-head"><strong>Lunch +10 min pre-bolus (Weekdays)</strong><span class="exp-status logging">logging</span></div><div class="exp-goal">Trim lunch TAR below 60% and cut peaks &gt;280 mg/dL</div><div class="exp-meta">Weekdays 11:20–12:10 · Start 2026-02-15 · Owner Dan</div><div class="exp-metric muted">Watch: Lunch 4h TAR, % predicted ≤ suspend, CGM 120–240 min slope</div><div class="exp-tags"><span class="exp-tag">Lunch</span><span class="exp-tag">Timing</span><span class="exp-tag">Pre-bolus</span></div><div class="exp-notes">Log at least 5 lunches with visible dosing; aim +10 min default, escalate to +20 if trend &gt;200 mg/dL after 60 min.</div></li><li><div class="exp-item-head"><strong>Corrections ISF sweep (+10%)</strong><span class="exp-status planned">planned</span></div><div class="exp-goal">Lift median 2h drop to ≥35 mg/dL and reduce ineffective cells</div><div class="exp-meta">Anytime corrections (IOB <1.5, no carbs ±4h) · Start 2026-02-16 · Owner Dan</div><div class="exp-metric muted">Watch: Corrections lens @120m (n, % ineffective, median drop)</div><div class="exp-tags"><span class="exp-tag">Corrections</span><span class="exp-tag">ISF</span></div><div class="exp-notes">Pilot at +10% on clean corrections when predicted ≤ suspend &lt;20%; pause if lows or comm errors spike.</div></li><li><div class="exp-item-head"><strong>ISF +10% — 14:00–16:30 CT (10 days)</strong><span class="exp-status running">running</span></div><div class="exp-goal">Assess daytime ISF bias and correction effectiveness in mid‑afternoon while lunch timing is tested separately.</div><div class="exp-meta">14:00–16:30 (America/Chicago) · Start 2026-02-16 · Owner Dan</div><div class="exp-metric muted">Watch: ISF Bias @120m (Observed − Expected), n, 95% CI; % ineffective @2h; constraint chips</div><div class="exp-tags"><span class="exp-tag">Corrections</span><span class="exp-tag">ISF</span><span class="exp-tag">Sandbox</span></div><div class="exp-notes">Track clean manual corrections ≥0.3 U; no carbs/exercise ±4h; avoid stacking. Flag ready-to-call when n≥6 and constraints low.</div></li></ul>
+      </div>
+      <div class="exp-column">
+        <h4>Past</h4>
+        <ul><li><div class="exp-item-head"><strong>Breakfast +5g add-on (Jan cohort)</strong><span class="exp-status complete">complete</span></div><div class="exp-goal">Test if 5g add-on offsets cereal under-counts</div><div class="exp-meta">Breakfast 6:30–8:30 · Start 2026-01-20 · End 2026-02-05 · Owner Dan</div><div class="exp-metric muted">Watch: Breakfast peaks &amp; 90–150 min &gt;180</div><div class="exp-tags"><span class="exp-tag">Breakfast</span><span class="exp-tag">Carb entry</span></div><div class="exp-notes">No material change; reverted to exact carb logging.</div></li></ul>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row">
+ <div class="card scenario-wrapper">
+  <div class="scenario-shell">
+  <input type="radio" name="scenario-mode" id="scenario-compact" checked>
+  <input type="radio" name="scenario-mode" id="scenario-expanded">
+  <div class="scenario-header">
+    <h3>Scenario Cards</h3>
+    <div class="scenario-toggle">
+      <label for="scenario-compact">Compact</label>
+      <label for="scenario-expanded">Expanded</label>
+    </div>
+  </div>
+  <div class="scenario-cards">
+    <article class="scenario-card">
+    <header>
+      <div>
+        <h4>Corrections: ISF ±10–20% — midday(11-13) | iob 0.5-1.5</h4>
+        <div class="scenario-link">Linked hypothesis: Corrections often ineffective → ISF may be too weak</div>
+        <div class="scenario-context">midday(11-13) | iob 0.5-1.5</div>
+        <div class="scenario-meta">Lever(s): ISF · Direction: ISF stronger → larger drops; weaker → smaller drops · Confidence: Medium</div>
+      </div>
+      <div class="gate-row"><span class="gate-chip med" title="Pred ≤ suspend: 19% (Pred ≤ suspend gate)"><span>Pred ≤ suspend</span><strong>19%</strong></span><span class="gate-chip med" title="AB cadence: 29% (AB cadence gate)"><span>AB cadence</span><strong>29%</strong></span><span class="gate-chip low" title="Max basal hits: 0% (Max basal hits gate)"><span>Max basal hits</span><strong>0%</strong></span></div>
+    </header>
+    <p class="quick-take">Quick take: Pred ≤ suspend pressure is moderate and AB cadence is moderate, so ISF stronger ~20% stays the lead lever because it cleans up stubborn corrections fastest while max basal headroom stays open for timing/ISF moves.</p>
+    <div class="view view-compact">
+      <ol><li><span class="option-label">ISF stronger ~20%</span> — ↑↑ 2–3h drops; ↓ 90–180 min TAR; avoid stacking <span class="risk-chip med" title="Risk gate: Pred ≤ suspend moderate / Max basal low">Med</span></li><li><span class="option-label">ISF stronger ~10%</span> — ↑ 2–3h drops; ↓ TAR; monitor predicted lows <span class="risk-chip med" title="Risk gate: Pred ≤ suspend moderate / Max basal low">Med</span></li><li><span class="option-label">As-is (baseline)</span> — for comparison <span class="risk-chip med" title="Risk gate: Pred ≤ suspend moderate / Max basal low">Med</span></li></ol>
+    </div>
+    <div class="view view-expanded">
+      <ol><li><span class="option-label">ISF stronger ~20%</span> — ↑↑ 2–3h drops; ↓ 90–180 min TAR; avoid stacking <span class="risk-chip med" title="Risk gate: Pred ≤ suspend moderate / Max basal low">Med</span></li><li><span class="option-label">ISF stronger ~10%</span> — ↑ 2–3h drops; ↓ TAR; monitor predicted lows <span class="risk-chip med" title="Risk gate: Pred ≤ suspend moderate / Max basal low">Med</span></li><li><span class="option-label">As-is (baseline)</span> — for comparison <span class="risk-chip med" title="Risk gate: Pred ≤ suspend moderate / Max basal low">Med</span></li></ol>
+      <details>
+        <summary>Why this ranking</summary>
+        <ul><li>n=12, 2h drop median -56 mg/dL; 3h 7</li><li>Ineffective at 2h (&lt;30 mg/dL drop): 100.0%</li></ul>
+      </details>
+      <details>
+        <summary>Risks</summary>
+        <ul><li>Avoid back-to-back corrections within DIA</li><li>Higher ISF increases drop magnitude; watch lows 2–3h post-bolus</li></ul>
+      </details>
+      <details>
+        <summary>Validation</summary>
+        <ul><li>Sandbox 1–2 clean corrections in this band: observe 2h/3h drops and lows; adjust hypothesis direction only (no numeric changes).</li></ul>
+      </details>
+    </div>
+  </article><article class="scenario-card">
+    <header>
+      <div>
+        <h4>Corrections: ISF ±10–20% — midday(11-13) | iob&lt;0.5</h4>
+        <div class="scenario-link">Linked hypothesis: Corrections often ineffective → ISF may be too weak</div>
+        <div class="scenario-context">midday(11-13) | iob&lt;0.5</div>
+        <div class="scenario-meta">Lever(s): ISF · Direction: ISF stronger → larger drops; weaker → smaller drops · Confidence: Low</div>
+      </div>
+      <div class="gate-row"><span class="gate-chip med" title="Pred ≤ suspend: 19% (Pred ≤ suspend gate)"><span>Pred ≤ suspend</span><strong>19%</strong></span><span class="gate-chip med" title="AB cadence: 29% (AB cadence gate)"><span>AB cadence</span><strong>29%</strong></span><span class="gate-chip low" title="Max basal hits: 0% (Max basal hits gate)"><span>Max basal hits</span><strong>0%</strong></span></div>
+    </header>
+    <p class="quick-take">Quick take: Pred ≤ suspend pressure is moderate and AB cadence is moderate, so ISF stronger ~20% stays the lead lever because it cleans up stubborn corrections fastest while max basal headroom stays open for timing/ISF moves.</p>
+    <div class="view view-compact">
+      <ol><li><span class="option-label">ISF stronger ~20%</span> — ↑↑ 2–3h drops; ↓ 90–180 min TAR; avoid stacking <span class="risk-chip med" title="Risk gate: Pred ≤ suspend moderate / Max basal low">Med</span></li><li><span class="option-label">ISF stronger ~10%</span> — ↑ 2–3h drops; ↓ TAR; monitor predicted lows <span class="risk-chip med" title="Risk gate: Pred ≤ suspend moderate / Max basal low">Med</span></li><li><span class="option-label">As-is (baseline)</span> — for comparison <span class="risk-chip med" title="Risk gate: Pred ≤ suspend moderate / Max basal low">Med</span></li></ol>
+    </div>
+    <div class="view view-expanded">
+      <ol><li><span class="option-label">ISF stronger ~20%</span> — ↑↑ 2–3h drops; ↓ 90–180 min TAR; avoid stacking <span class="risk-chip med" title="Risk gate: Pred ≤ suspend moderate / Max basal low">Med</span></li><li><span class="option-label">ISF stronger ~10%</span> — ↑ 2–3h drops; ↓ TAR; monitor predicted lows <span class="risk-chip med" title="Risk gate: Pred ≤ suspend moderate / Max basal low">Med</span></li><li><span class="option-label">As-is (baseline)</span> — for comparison <span class="risk-chip med" title="Risk gate: Pred ≤ suspend moderate / Max basal low">Med</span></li></ol>
+      <details>
+        <summary>Why this ranking</summary>
+        <ul><li>n=5, 2h drop median -146 mg/dL; 3h -110</li><li>Ineffective at 2h (&lt;30 mg/dL drop): 100.0%</li></ul>
+      </details>
+      <details>
+        <summary>Risks</summary>
+        <ul><li>Avoid back-to-back corrections within DIA</li><li>Higher ISF increases drop magnitude; watch lows 2–3h post-bolus</li></ul>
+      </details>
+      <details>
+        <summary>Validation</summary>
+        <ul><li>Sandbox 1–2 clean corrections in this band: observe 2h/3h drops and lows; adjust hypothesis direction only (no numeric changes).</li></ul>
+      </details>
+    </div>
+  </article><article class="scenario-card">
+    <header>
+      <div>
+        <h4>Corrections: ISF ±10–20% — midday(11-13) | iob&gt;1.5</h4>
+        <div class="scenario-link">Linked hypothesis: Corrections often ineffective → ISF may be too weak</div>
+        <div class="scenario-context">midday(11-13) | iob&gt;1.5</div>
+        <div class="scenario-meta">Lever(s): ISF · Direction: ISF stronger → larger drops; weaker → smaller drops · Confidence: Low</div>
+      </div>
+      <div class="gate-row"><span class="gate-chip med" title="Pred ≤ suspend: 19% (Pred ≤ suspend gate)"><span>Pred ≤ suspend</span><strong>19%</strong></span><span class="gate-chip med" title="AB cadence: 29% (AB cadence gate)"><span>AB cadence</span><strong>29%</strong></span><span class="gate-chip low" title="Max basal hits: 0% (Max basal hits gate)"><span>Max basal hits</span><strong>0%</strong></span></div>
+    </header>
+    <p class="quick-take">Quick take: Pred ≤ suspend pressure is moderate and AB cadence is moderate, so ISF stronger ~20% stays the lead lever because it cleans up stubborn corrections fastest while max basal headroom stays open for timing/ISF moves.</p>
+    <div class="view view-compact">
+      <ol><li><span class="option-label">ISF stronger ~20%</span> — ↑↑ 2–3h drops; ↓ 90–180 min TAR; avoid stacking <span class="risk-chip med" title="Risk gate: Pred ≤ suspend moderate / Max basal low">Med</span></li><li><span class="option-label">ISF stronger ~10%</span> — ↑ 2–3h drops; ↓ TAR; monitor predicted lows <span class="risk-chip med" title="Risk gate: Pred ≤ suspend moderate / Max basal low">Med</span></li><li><span class="option-label">As-is (baseline)</span> — for comparison <span class="risk-chip med" title="Risk gate: Pred ≤ suspend moderate / Max basal low">Med</span></li></ol>
+    </div>
+    <div class="view view-expanded">
+      <ol><li><span class="option-label">ISF stronger ~20%</span> — ↑↑ 2–3h drops; ↓ 90–180 min TAR; avoid stacking <span class="risk-chip med" title="Risk gate: Pred ≤ suspend moderate / Max basal low">Med</span></li><li><span class="option-label">ISF stronger ~10%</span> — ↑ 2–3h drops; ↓ TAR; monitor predicted lows <span class="risk-chip med" title="Risk gate: Pred ≤ suspend moderate / Max basal low">Med</span></li><li><span class="option-label">As-is (baseline)</span> — for comparison <span class="risk-chip med" title="Risk gate: Pred ≤ suspend moderate / Max basal low">Med</span></li></ol>
+      <details>
+        <summary>Why this ranking</summary>
+        <ul><li>n=3, 2h drop median 19 mg/dL; 3h 37</li><li>Ineffective at 2h (&lt;30 mg/dL drop): 100.0%</li></ul>
+      </details>
+      <details>
+        <summary>Risks</summary>
+        <ul><li>Avoid back-to-back corrections within DIA</li><li>Higher ISF increases drop magnitude; watch lows 2–3h post-bolus</li></ul>
+      </details>
+      <details>
+        <summary>Validation</summary>
+        <ul><li>Sandbox 1–2 clean corrections in this band: observe 2h/3h drops and lows; adjust hypothesis direction only (no numeric changes).</li></ul>
+      </details>
+    </div>
+  </article><article class="scenario-card">
+    <header>
+      <div>
+        <h4>Corrections: ISF ±10–20% — other | iob 0.5-1.5</h4>
+        <div class="scenario-link">Linked hypothesis: Corrections often ineffective → ISF may be too weak</div>
+        <div class="scenario-context">other | iob 0.5-1.5</div>
+        <div class="scenario-meta">Lever(s): ISF · Direction: ISF stronger → larger drops; weaker → smaller drops · Confidence: Low</div>
+      </div>
+      <div class="gate-row"><span class="gate-chip med" title="Pred ≤ suspend: 19% (Pred ≤ suspend gate)"><span>Pred ≤ suspend</span><strong>19%</strong></span><span class="gate-chip med" title="AB cadence: 29% (AB cadence gate)"><span>AB cadence</span><strong>29%</strong></span><span class="gate-chip low" title="Max basal hits: 0% (Max basal hits gate)"><span>Max basal hits</span><strong>0%</strong></span></div>
+    </header>
+    <p class="quick-take">Quick take: Pred ≤ suspend pressure is moderate and AB cadence is moderate, so ISF stronger ~20% stays the lead lever because it cleans up stubborn corrections fastest while max basal headroom stays open for timing/ISF moves.</p>
+    <div class="view view-compact">
+      <ol><li><span class="option-label">ISF stronger ~20%</span> — ↑↑ 2–3h drops; ↓ 90–180 min TAR; avoid stacking <span class="risk-chip med" title="Risk gate: Pred ≤ suspend moderate / Max basal low">Med</span></li><li><span class="option-label">ISF stronger ~10%</span> — ↑ 2–3h drops; ↓ TAR; monitor predicted lows <span class="risk-chip med" title="Risk gate: Pred ≤ suspend moderate / Max basal low">Med</span></li><li><span class="option-label">As-is (baseline)</span> — for comparison <span class="risk-chip med" title="Risk gate: Pred ≤ suspend moderate / Max basal low">Med</span></li></ol>
+    </div>
+    <div class="view view-expanded">
+      <ol><li><span class="option-label">ISF stronger ~20%</span> — ↑↑ 2–3h drops; ↓ 90–180 min TAR; avoid stacking <span class="risk-chip med" title="Risk gate: Pred ≤ suspend moderate / Max basal low">Med</span></li><li><span class="option-label">ISF stronger ~10%</span> — ↑ 2–3h drops; ↓ TAR; monitor predicted lows <span class="risk-chip med" title="Risk gate: Pred ≤ suspend moderate / Max basal low">Med</span></li><li><span class="option-label">As-is (baseline)</span> — for comparison <span class="risk-chip med" title="Risk gate: Pred ≤ suspend moderate / Max basal low">Med</span></li></ol>
+      <details>
+        <summary>Why this ranking</summary>
+        <ul><li>n=5, 2h drop median -96 mg/dL; 3h -81</li><li>Ineffective at 2h (&lt;30 mg/dL drop): 60.0%</li></ul>
+      </details>
+      <details>
+        <summary>Risks</summary>
+        <ul><li>Avoid back-to-back corrections within DIA</li><li>Higher ISF increases drop magnitude; watch lows 2–3h post-bolus</li></ul>
+      </details>
+      <details>
+        <summary>Validation</summary>
+        <ul><li>Sandbox 1–2 clean corrections in this band: observe 2h/3h drops and lows; adjust hypothesis direction only (no numeric changes).</li></ul>
+      </details>
+    </div>
+  </article><article class="scenario-card">
+    <header>
+      <div>
+        <h4>Corrections: ISF ±10–20% — other | iob&gt;1.5</h4>
+        <div class="scenario-link">Linked hypothesis: Corrections often ineffective → ISF may be too weak</div>
+        <div class="scenario-context">other | iob&gt;1.5</div>
+        <div class="scenario-meta">Lever(s): ISF · Direction: ISF stronger → larger drops; weaker → smaller drops · Confidence: Low</div>
+      </div>
+      <div class="gate-row"><span class="gate-chip med" title="Pred ≤ suspend: 19% (Pred ≤ suspend gate)"><span>Pred ≤ suspend</span><strong>19%</strong></span><span class="gate-chip med" title="AB cadence: 29% (AB cadence gate)"><span>AB cadence</span><strong>29%</strong></span><span class="gate-chip low" title="Max basal hits: 0% (Max basal hits gate)"><span>Max basal hits</span><strong>0%</strong></span></div>
+    </header>
+    <p class="quick-take">Quick take: Pred ≤ suspend pressure is moderate and AB cadence is moderate, so ISF stronger ~20% stays the lead lever because it cleans up stubborn corrections fastest while max basal headroom stays open for timing/ISF moves.</p>
+    <div class="view view-compact">
+      <ol><li><span class="option-label">ISF stronger ~20%</span> — ↑↑ 2–3h drops; ↓ 90–180 min TAR; avoid stacking <span class="risk-chip med" title="Risk gate: Pred ≤ suspend moderate / Max basal low">Med</span></li><li><span class="option-label">ISF stronger ~10%</span> — ↑ 2–3h drops; ↓ TAR; monitor predicted lows <span class="risk-chip med" title="Risk gate: Pred ≤ suspend moderate / Max basal low">Med</span></li><li><span class="option-label">As-is (baseline)</span> — for comparison <span class="risk-chip med" title="Risk gate: Pred ≤ suspend moderate / Max basal low">Med</span></li></ol>
+    </div>
+    <div class="view view-expanded">
+      <ol><li><span class="option-label">ISF stronger ~20%</span> — ↑↑ 2–3h drops; ↓ 90–180 min TAR; avoid stacking <span class="risk-chip med" title="Risk gate: Pred ≤ suspend moderate / Max basal low">Med</span></li><li><span class="option-label">ISF stronger ~10%</span> — ↑ 2–3h drops; ↓ TAR; monitor predicted lows <span class="risk-chip med" title="Risk gate: Pred ≤ suspend moderate / Max basal low">Med</span></li><li><span class="option-label">As-is (baseline)</span> — for comparison <span class="risk-chip med" title="Risk gate: Pred ≤ suspend moderate / Max basal low">Med</span></li></ol>
+      <details>
+        <summary>Why this ranking</summary>
+        <ul><li>n=7, 2h drop median 92 mg/dL; 3h 160</li><li>Ineffective at 2h (&lt;30 mg/dL drop): 0.0%</li></ul>
+      </details>
+      <details>
+        <summary>Risks</summary>
+        <ul><li>Avoid back-to-back corrections within DIA</li><li>Higher ISF increases drop magnitude; watch lows 2–3h post-bolus</li></ul>
+      </details>
+      <details>
+        <summary>Validation</summary>
+        <ul><li>Sandbox 1–2 clean corrections in this band: observe 2h/3h drops and lows; adjust hypothesis direction only (no numeric changes).</li></ul>
+      </details>
+    </div>
+  </article><article class="scenario-card">
+    <header>
+      <div>
+        <h4>Corrections: ISF ±10–20% — overnight(0-4) | iob 0.5-1.5</h4>
+        <div class="scenario-link">Linked hypothesis: Corrections often ineffective → ISF may be too weak</div>
+        <div class="scenario-context">overnight(0-4) | iob 0.5-1.5</div>
+        <div class="scenario-meta">Lever(s): ISF · Direction: ISF stronger → larger drops; weaker → smaller drops · Confidence: Medium</div>
+      </div>
+      <div class="gate-row"><span class="gate-chip med" title="Pred ≤ suspend: 19% (Pred ≤ suspend gate)"><span>Pred ≤ suspend</span><strong>19%</strong></span><span class="gate-chip med" title="AB cadence: 29% (AB cadence gate)"><span>AB cadence</span><strong>29%</strong></span><span class="gate-chip low" title="Max basal hits: 0% (Max basal hits gate)"><span>Max basal hits</span><strong>0%</strong></span></div>
+    </header>
+    <p class="quick-take">Quick take: Pred ≤ suspend pressure is moderate and AB cadence is moderate, so ISF stronger ~20% stays the lead lever because it cleans up stubborn corrections fastest while max basal headroom stays open for timing/ISF moves.</p>
+    <div class="view view-compact">
+      <ol><li><span class="option-label">ISF stronger ~20%</span> — ↑↑ 2–3h drops; ↓ 90–180 min TAR; avoid stacking <span class="risk-chip med" title="Risk gate: Pred ≤ suspend moderate / Max basal low">Med</span></li><li><span class="option-label">ISF stronger ~10%</span> — ↑ 2–3h drops; ↓ TAR; monitor predicted lows <span class="risk-chip med" title="Risk gate: Pred ≤ suspend moderate / Max basal low">Med</span></li><li><span class="option-label">As-is (baseline)</span> — for comparison <span class="risk-chip med" title="Risk gate: Pred ≤ suspend moderate / Max basal low">Med</span></li></ol>
+    </div>
+    <div class="view view-expanded">
+      <ol><li><span class="option-label">ISF stronger ~20%</span> — ↑↑ 2–3h drops; ↓ 90–180 min TAR; avoid stacking <span class="risk-chip med" title="Risk gate: Pred ≤ suspend moderate / Max basal low">Med</span></li><li><span class="option-label">ISF stronger ~10%</span> — ↑ 2–3h drops; ↓ TAR; monitor predicted lows <span class="risk-chip med" title="Risk gate: Pred ≤ suspend moderate / Max basal low">Med</span></li><li><span class="option-label">As-is (baseline)</span> — for comparison <span class="risk-chip med" title="Risk gate: Pred ≤ suspend moderate / Max basal low">Med</span></li></ol>
+      <details>
+        <summary>Why this ranking</summary>
+        <ul><li>n=51, 2h drop median 47 mg/dL; 3h 61</li><li>Ineffective at 2h (&lt;30 mg/dL drop): 17.6%</li></ul>
+      </details>
+      <details>
+        <summary>Risks</summary>
+        <ul><li>Avoid back-to-back corrections within DIA</li><li>Higher ISF increases drop magnitude; watch lows 2–3h post-bolus</li></ul>
+      </details>
+      <details>
+        <summary>Validation</summary>
+        <ul><li>Sandbox 1–2 clean corrections in this band: observe 2h/3h drops and lows; adjust hypothesis direction only (no numeric changes).</li></ul>
+      </details>
+    </div>
+  </article><article class="scenario-card">
+    <header>
+      <div>
+        <h4>Corrections: ISF ±10–20% — overnight(0-4) | iob&lt;0.5</h4>
+        <div class="scenario-link">Linked hypothesis: Corrections often ineffective → ISF may be too weak</div>
+        <div class="scenario-context">overnight(0-4) | iob&lt;0.5</div>
+        <div class="scenario-meta">Lever(s): ISF · Direction: ISF stronger → larger drops; weaker → smaller drops · Confidence: Medium</div>
+      </div>
+      <div class="gate-row"><span class="gate-chip med" title="Pred ≤ suspend: 19% (Pred ≤ suspend gate)"><span>Pred ≤ suspend</span><strong>19%</strong></span><span class="gate-chip med" title="AB cadence: 29% (AB cadence gate)"><span>AB cadence</span><strong>29%</strong></span><span class="gate-chip low" title="Max basal hits: 0% (Max basal hits gate)"><span>Max basal hits</span><strong>0%</strong></span></div>
+    </header>
+    <p class="quick-take">Quick take: Pred ≤ suspend pressure is moderate and AB cadence is moderate, so ISF stronger ~20% stays the lead lever because it cleans up stubborn corrections fastest while max basal headroom stays open for timing/ISF moves.</p>
+    <div class="view view-compact">
+      <ol><li><span class="option-label">ISF stronger ~20%</span> — ↑↑ 2–3h drops; ↓ 90–180 min TAR; avoid stacking <span class="risk-chip med" title="Risk gate: Pred ≤ suspend moderate / Max basal low">Med</span></li><li><span class="option-label">ISF stronger ~10%</span> — ↑ 2–3h drops; ↓ TAR; monitor predicted lows <span class="risk-chip med" title="Risk gate: Pred ≤ suspend moderate / Max basal low">Med</span></li><li><span class="option-label">As-is (baseline)</span> — for comparison <span class="risk-chip med" title="Risk gate: Pred ≤ suspend moderate / Max basal low">Med</span></li></ol>
+    </div>
+    <div class="view view-expanded">
+      <ol><li><span class="option-label">ISF stronger ~20%</span> — ↑↑ 2–3h drops; ↓ 90–180 min TAR; avoid stacking <span class="risk-chip med" title="Risk gate: Pred ≤ suspend moderate / Max basal low">Med</span></li><li><span class="option-label">ISF stronger ~10%</span> — ↑ 2–3h drops; ↓ TAR; monitor predicted lows <span class="risk-chip med" title="Risk gate: Pred ≤ suspend moderate / Max basal low">Med</span></li><li><span class="option-label">As-is (baseline)</span> — for comparison <span class="risk-chip med" title="Risk gate: Pred ≤ suspend moderate / Max basal low">Med</span></li></ol>
+      <details>
+        <summary>Why this ranking</summary>
+        <ul><li>n=8, 2h drop median 23 mg/dL; 3h 23</li><li>Ineffective at 2h (&lt;30 mg/dL drop): 50.0%</li></ul>
+      </details>
+      <details>
+        <summary>Risks</summary>
+        <ul><li>Avoid back-to-back corrections within DIA</li><li>Higher ISF increases drop magnitude; watch lows 2–3h post-bolus</li></ul>
+      </details>
+      <details>
+        <summary>Validation</summary>
+        <ul><li>Sandbox 1–2 clean corrections in this band: observe 2h/3h drops and lows; adjust hypothesis direction only (no numeric changes).</li></ul>
+      </details>
+    </div>
+  </article><article class="scenario-card">
+    <header>
+      <div>
+        <h4>Corrections: ISF ±10–20% — overnight(0-4) | iob&gt;1.5</h4>
+        <div class="scenario-link">Linked hypothesis: Corrections often ineffective → ISF may be too weak</div>
+        <div class="scenario-context">overnight(0-4) | iob&gt;1.5</div>
+        <div class="scenario-meta">Lever(s): ISF · Direction: ISF stronger → larger drops; weaker → smaller drops · Confidence: Medium</div>
+      </div>
+      <div class="gate-row"><span class="gate-chip med" title="Pred ≤ suspend: 19% (Pred ≤ suspend gate)"><span>Pred ≤ suspend</span><strong>19%</strong></span><span class="gate-chip med" title="AB cadence: 29% (AB cadence gate)"><span>AB cadence</span><strong>29%</strong></span><span class="gate-chip low" title="Max basal hits: 0% (Max basal hits gate)"><span>Max basal hits</span><strong>0%</strong></span></div>
+    </header>
+    <p class="quick-take">Quick take: Pred ≤ suspend pressure is moderate and AB cadence is moderate, so ISF stronger ~20% stays the lead lever because it cleans up stubborn corrections fastest while max basal headroom stays open for timing/ISF moves.</p>
+    <div class="view view-compact">
+      <ol><li><span class="option-label">ISF stronger ~20%</span> — ↑↑ 2–3h drops; ↓ 90–180 min TAR; avoid stacking <span class="risk-chip med" title="Risk gate: Pred ≤ suspend moderate / Max basal low">Med</span></li><li><span class="option-label">ISF stronger ~10%</span> — ↑ 2–3h drops; ↓ TAR; monitor predicted lows <span class="risk-chip med" title="Risk gate: Pred ≤ suspend moderate / Max basal low">Med</span></li><li><span class="option-label">As-is (baseline)</span> — for comparison <span class="risk-chip med" title="Risk gate: Pred ≤ suspend moderate / Max basal low">Med</span></li></ol>
+    </div>
+    <div class="view view-expanded">
+      <ol><li><span class="option-label">ISF stronger ~20%</span> — ↑↑ 2–3h drops; ↓ 90–180 min TAR; avoid stacking <span class="risk-chip med" title="Risk gate: Pred ≤ suspend moderate / Max basal low">Med</span></li><li><span class="option-label">ISF stronger ~10%</span> — ↑ 2–3h drops; ↓ TAR; monitor predicted lows <span class="risk-chip med" title="Risk gate: Pred ≤ suspend moderate / Max basal low">Med</span></li><li><span class="option-label">As-is (baseline)</span> — for comparison <span class="risk-chip med" title="Risk gate: Pred ≤ suspend moderate / Max basal low">Med</span></li></ol>
+      <details>
+        <summary>Why this ranking</summary>
+        <ul><li>n=41, 2h drop median 58 mg/dL; 3h 99</li><li>Ineffective at 2h (&lt;30 mg/dL drop): 17.1%</li></ul>
+      </details>
+      <details>
+        <summary>Risks</summary>
+        <ul><li>Avoid back-to-back corrections within DIA</li><li>Higher ISF increases drop magnitude; watch lows 2–3h post-bolus</li></ul>
+      </details>
+      <details>
+        <summary>Validation</summary>
+        <ul><li>Sandbox 1–2 clean corrections in this band: observe 2h/3h drops and lows; adjust hypothesis direction only (no numeric changes).</li></ul>
+      </details>
+    </div>
+  </article>
+  </div>
+  <div class="scenario-legend">Legend: Chips show Pred ≤ suspend (green <10%, amber 10–25%, red ≥25%), AB cadence (<15%, 15–30%, >30%), and Max basal hits (0%, 0–5%, ≥5%). Risk chips align with the same color scale.</div>
+</div>
+ </div>
+</div>
+<div class="row">
+ <div class="card corrections-card">
+  <div class="corrections-meta">
+    <h3>Corrections Lens @120m</h3>
+    <div class="heatmap-toggle"><strong>2h</strong> · <a href="../dist/corr_heatmap_3h.svg?v=20260216-2005" target="_blank" rel="noopener">3h SVG</a></div>
+  </div>
+  <svg role="img" aria-label="Corrections heatmap: median 2h change by daypart and IOB band" xmlns="http://www.w3.org/2000/svg" width="850" height="352" role="img" aria-label="Corrections heatmap 2h"><style>text{font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;} .sentinel-header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:8px}
+ .sentinel-asof{font-size:12px;color:#555;margin-top:4px}
+ .reliability-chips{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+ .reliability-chip{display:flex;flex-direction:column;gap:2px;padding:6px 10px;border-radius:10px;border:1px solid #e0e0e0;font-size:11px;min-width:130px;background:#fff}
+ .reliability-chip span{color:#555;font-weight:500}
+ .reliability-chip strong{font-size:15px;color:#111}
+ .reliability-chip.low{background:#ecf9f1;border-color:#b4e3cf}
+ .reliability-chip.med{background:#fff8e5;border-color:#f5d086}
+ .reliability-chip.high{background:#fdecea;border-color:#fab1a0}
+ .reliability-chip.muted{background:#f5f5f5;border-color:#ddd;color:#777}
+ .spark-container{margin-top:12px}
+ .spark-legend{display:flex;gap:16px;font-size:11px;color:#555;margin-top:6px}
+ .spark-legend .pred{color:#0d6efd;font-weight:600}
+ .spark-legend .comm{color:#f97316;font-weight:600}
+ .corrections-card svg{width:100%;height:auto}
+ .corrections-meta{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+ .corrections-meta h3{margin:0}
+ .heatmap-toggle{font-size:12px;color:#555}
+ .heatmap-toggle strong{color:#0d6efd}
+ .heatmap-toggle a{color:#0d6efd;font-weight:600;text-decoration:none}
+ .heatmap-note{font-size:11px;color:#555;margin-top:6px}
+ .card.corrections-card{flex:2 1 420px}
+
+</style><text x="20" y="20" font-size="14" font-weight="600">Corrections lens · Median 2h drop (mg/dL)</text><text x="220" y="32" text-anchor="middle" font-size="14" font-weight="600">Overnight</text><text x="220" y="50" text-anchor="middle" font-size="11" fill="#666">0–4</text><text x="360" y="32" text-anchor="middle" font-size="14" font-weight="600">Morning</text><text x="360" y="50" text-anchor="middle" font-size="11" fill="#666">6–9</text><text x="500" y="32" text-anchor="middle" font-size="14" font-weight="600">Midday</text><text x="500" y="50" text-anchor="middle" font-size="11" fill="#666">11–13</text><text x="640" y="32" text-anchor="middle" font-size="14" font-weight="600">Evening</text><text x="640" y="50" text-anchor="middle" font-size="11" fill="#666">17–21</text><text x="780" y="32" text-anchor="middle" font-size="14" font-weight="600">Other</text><text x="780" y="50" text-anchor="middle" font-size="11" fill="#666">All other</text><text x="138" y="114" text-anchor="end" font-size="13" font-weight="600">IOB <0.5</text><text x="138" y="202" text-anchor="end" font-size="13" font-weight="600">IOB 0.5–1.5</text><text x="138" y="290" text-anchor="end" font-size="13" font-weight="600">IOB >1.5</text><g><rect x="158" y="78" width="124" height="70" rx="14" fill="#f5f5f5" stroke="#d4d4d4" stroke-width="0.6"/><text x="220" y="107" text-anchor="middle" font-size="13" font-weight="600" fill="#1b1b1b">↓ 0 mg/dL</text><text x="220" y="136" text-anchor="middle" font-size="11" fill="#1b1b1b" opacity="0.9">0 | 0%</text></g><g><rect x="298" y="78" width="124" height="70" rx="14" fill="#f5f5f5" stroke="#d4d4d4" stroke-width="0.6"/><text x="360" y="107" text-anchor="middle" font-size="13" font-weight="600" fill="#1b1b1b">↓ 0 mg/dL</text><text x="360" y="136" text-anchor="middle" font-size="11" fill="#1b1b1b" opacity="0.9">0 | 0%</text></g><g><rect x="438" y="78" width="124" height="70" rx="14" fill="#f5f5f5" stroke="#d4d4d4" stroke-width="0.6"/><text x="500" y="107" text-anchor="middle" font-size="13" font-weight="600" fill="#1b1b1b">↓ 0 mg/dL</text><text x="500" y="136" text-anchor="middle" font-size="11" fill="#1b1b1b" opacity="0.9">0 | 0%</text></g><g><rect x="578" y="78" width="124" height="70" rx="14" fill="#f5f5f5" stroke="#d4d4d4" stroke-width="0.6"/><text x="640" y="107" text-anchor="middle" font-size="13" font-weight="600" fill="#1b1b1b">↓ 0 mg/dL</text><text x="640" y="136" text-anchor="middle" font-size="11" fill="#1b1b1b" opacity="0.9">0 | 0%</text></g><g><rect x="718" y="78" width="124" height="70" rx="14" fill="#f5f5f5" stroke="#d4d4d4" stroke-width="0.6"/><text x="780" y="107" text-anchor="middle" font-size="13" font-weight="600" fill="#1b1b1b">↓ 0 mg/dL</text><text x="780" y="136" text-anchor="middle" font-size="11" fill="#1b1b1b" opacity="0.9">0 | 0%</text></g><g><rect x="158" y="166" width="124" height="70" rx="14" fill="#f5f5f5" stroke="#d4d4d4" stroke-width="0.6"/><text x="220" y="195" text-anchor="middle" font-size="13" font-weight="600" fill="#1b1b1b">↓ 0 mg/dL</text><text x="220" y="224" text-anchor="middle" font-size="11" fill="#1b1b1b" opacity="0.9">0 | 0%</text></g><g><rect x="298" y="166" width="124" height="70" rx="14" fill="#f5f5f5" stroke="#d4d4d4" stroke-width="0.6"/><text x="360" y="195" text-anchor="middle" font-size="13" font-weight="600" fill="#1b1b1b">↓ 0 mg/dL</text><text x="360" y="224" text-anchor="middle" font-size="11" fill="#1b1b1b" opacity="0.9">0 | 0%</text></g><g><rect x="438" y="166" width="124" height="70" rx="14" fill="#f2c5af" stroke="#d4d4d4" stroke-width="0.6"/><text x="500" y="195" text-anchor="middle" font-size="13" font-weight="600" fill="#1b1b1b">↑ 37 mg/dL</text><text x="500" y="224" text-anchor="middle" font-size="11" fill="#1b1b1b" opacity="0.9">2 | 100%</text></g><g><rect x="578" y="166" width="124" height="70" rx="14" fill="#f5f5f5" stroke="#d4d4d4" stroke-width="0.6"/><text x="640" y="195" text-anchor="middle" font-size="13" font-weight="600" fill="#1b1b1b">↓ 0 mg/dL</text><text x="640" y="224" text-anchor="middle" font-size="11" fill="#1b1b1b" opacity="0.9">0 | 0%</text></g><g><rect x="718" y="166" width="124" height="70" rx="14" fill="#407fbf" stroke="#d4d4d4" stroke-width="0.6"/><text x="780" y="195" text-anchor="middle" font-size="13" font-weight="600" fill="#fefefe">↓ 94 mg/dL</text><text x="780" y="224" text-anchor="middle" font-size="11" fill="#fefefe" opacity="0.9">1 | 0%</text></g><g><rect x="158" y="254" width="124" height="70" rx="14" fill="#f1bea4" stroke="#d4d4d4" stroke-width="0.6"/><text x="220" y="283" text-anchor="middle" font-size="13" font-weight="600" fill="#1b1b1b">↑ 42 mg/dL</text><text x="220" y="312" text-anchor="middle" font-size="11" fill="#1b1b1b" opacity="0.9">2 | 100%</text></g><g><rect x="298" y="254" width="124" height="70" rx="14" fill="#f5f5f5" stroke="#d4d4d4" stroke-width="0.6"/><text x="360" y="283" text-anchor="middle" font-size="13" font-weight="600" fill="#1b1b1b">↓ 0 mg/dL</text><text x="360" y="312" text-anchor="middle" font-size="11" fill="#1b1b1b" opacity="0.9">0 | 0%</text></g><g><rect x="438" y="254" width="124" height="70" rx="14" fill="#d8e4f1" stroke="#d4d4d4" stroke-width="0.6"/><text x="500" y="283" text-anchor="middle" font-size="13" font-weight="600" fill="#1b1b1b">↓ 19 mg/dL</text><text x="500" y="312" text-anchor="middle" font-size="11" fill="#1b1b1b" opacity="0.9">2 | 100%</text></g><g><rect x="578" y="254" width="124" height="70" rx="14" fill="#f5f5f5" stroke="#d4d4d4" stroke-width="0.6"/><text x="640" y="283" text-anchor="middle" font-size="13" font-weight="600" fill="#1b1b1b">↓ 0 mg/dL</text><text x="640" y="312" text-anchor="middle" font-size="11" fill="#1b1b1b" opacity="0.9">0 | 0%</text></g><g><rect x="718" y="254" width="124" height="70" rx="14" fill="#1764b1" stroke="#d4d4d4" stroke-width="0.6"/><text x="780" y="283" text-anchor="middle" font-size="13" font-weight="600" fill="#fefefe">↓ 114 mg/dL</text><text x="780" y="312" text-anchor="middle" font-size="11" fill="#fefefe" opacity="0.9">5 | 0%</text></g><text x="150" y="346" font-size="10" fill="#555">Overlay: n | %ineff2h (ineffective = &lt;20 mg/dL drop)</text></svg>
+  <div class="heatmap-note">Blue = stronger drops, white = neutral, orange/red = weak or rising corrections. Overlay text shows n | %ineff2h.</div>
+  <div class="isf-bias-wrap" style="margin-top:10px">
+    <h4 style="margin:6px 0">ISF Bias (Observed − Expected)</h4>
+    <div class="muted" title="Expected mg/dL/U comes from the latest profile ISF at that local time. Observed mg/dL/U is the median 2h drop per unit for insulin-only corrections (no carbs ±15m). Bias = Observed − Expected.">Tooltip: Expected from profile ISF; Observed = median 2h drop per U; Bias = Observed − Expected.</div>
+    <table style="margin-top:6px"><thead><tr><th>Daypart</th><th>IOB band</th><th>n</th><th>Bias (med [95% CI])</th><th></th></tr></thead><tbody><tr><td>midday(11-13)</td><td>iob 0.5-1.5</td><td>2 <span class="muted" title="Small sample">⚠︎</span></td><td>n/a</td><td></td></tr><tr><td>midday(11-13)</td><td>iob&gt;1.5</td><td>2 <span class="muted" title="Small sample">⚠︎</span></td><td>n/a</td><td></td></tr><tr><td>other</td><td>iob 0.5-1.5</td><td>1 <span class="muted" title="Small sample">⚠︎</span></td><td>n/a</td><td></td></tr><tr><td>other</td><td>iob&gt;1.5</td><td>5 <span class="muted" title="Small sample">⚠︎</span></td><td>n/a</td><td></td></tr><tr><td>overnight(0-4)</td><td>iob&gt;1.5</td><td>2 <span class="muted" title="Small sample">⚠︎</span></td><td>n/a</td><td></td></tr></tbody></table>
+  </div>
+  <div class="heatmap-interpretation">
+    <h4>How to read</h4>
+    <ul>
+      <li>Columns are dayparts; rows are IOB bands at the time of correction.</li>
+      <li>Cell color encodes median BG change after the correction (bluer = larger drop).</li>
+      <li>Text shows sample size and 2h ineffectiveness (n | %ineff2h; ineffective = &lt;20 mg/dL drop).</li>
+    </ul>
+    <h4>Key takeaways (auto‑generated)</h4>
+    <ul id="corr-takeaways"><li>Some cells have small n; treat those cells as directional only.</li></ul>
+  </div>
+ </div>
+</div>
+</body></html>
