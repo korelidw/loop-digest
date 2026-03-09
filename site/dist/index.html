@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Loop Digest — Nightly Dashboard</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin: 2rem; color: #111; }
+    h1 { font-size: 1.6rem; margin-bottom: 0.25rem; }
+    .ts { color: #666; font-size: 0.95rem; margin-bottom: 1rem; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+    .card { border: 1px solid #e3e3e3; border-radius: 8px; padding: 12px; }
+    .k { color: #555; }
+    .v { font-weight: 600; }
+  </style>
+</head>
+<body>
+  <h1>Nightly Mini Dashboard (last 24h)</h1>
+  <div class="ts">Generated at 2026-02-19T21:00:00-06:00</div>
+  <div class="cards">
+    <div class="card"><div class="k">CGM readings</div><div class="v">743</div></div>
+    <div class="card"><div class="k">TIR (70–180)</div><div class="v">50.3%</div></div>
+    <div class="card"><div class="k">TBR &lt;70</div><div class="v">4.3% (32)</div></div>
+    <div class="card"><div class="k">Severe lows &lt;54</div><div class="v">18</div></div>
+    <div class="card"><div class="k">Predicted ≤ 70 (Loop)</div><div class="v">19.7% of 299 samples</div></div>
+    <div class="card"><div class="k">Pump comm errors</div><div class="v">15.4% of 299 samples</div></div>
+  </div>
+</body>
+</html>
