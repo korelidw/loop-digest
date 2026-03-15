@@ -1,0 +1,11 @@
+{
+  "window_start": "2026-03-14T02:04:56Z",
+  "total_readings": 637,
+  "lt70_count": 0,
+  "lt54_count": 0,
+  "tir_pct": 63.3,
+  "tbr_pct": 0.0,
+  "loop_samples": 274,
+  "predicted_low_pct": 0.0,
+  "pump_comm_error_pct": 0.0
+}
