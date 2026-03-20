@@ -1,39 +1,19 @@
 <!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Loop Digest - Nightly Dashboard</title>
-  <style>
-    body { font: 16px/1.4 -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin: 2rem; color: #222; }
-    h1 { font-size: 1.4rem; margin-bottom: .5rem; }
-    .muted { color: #666; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-top: 1rem; }
-    .card { border: 1px solid #eee; border-radius: 8px; padding: 1rem; }
-    .k { font-size: .85rem; color: #666; }
-    .v { font-size: 1.4rem; font-weight: 600; }
-  </style>
-</head>
-<body>
-  <h1>Nightly Dashboard</h1>
-  <div class="muted">Last 24 hours</div>
-  <div id="grid" class="grid"></div>
-  <script>
-    fetch('./metrics.json').then(r => r.json()).then(m => {
-      const items = [
-        {k:'Readings', v: m.total_readings},
-        {k:'<70 count', v: m.lt70_count},
-        {k:'<54 count', v: m.lt54_count},
-        {k:'TIR (70-180)', v: m.tir_pct + '%'},
-        {k:'TBR (<70)', v: m.tbr_pct + '%'},
-        {k:'Loop samples', v: m.loop_samples},
-        {k:'Pred ≤70', v: m.predicted_low_pct + '%'},
-        {k:'Pump comm errors', v: m.pump_comm_error_pct + '%'},
-        {k:'Window start (UTC)', v: m.window_start}
-      ];
-      const grid = document.getElementById('grid');
-      grid.innerHTML = items.map(i => `<div class="card"><div class="k">${i.k}</div><div class="v">${i.v}</div></div>`).join('');
-    });
-  </script>
-</body>
-</html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Loop Digest — Nightly</title>
+<style>body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:24px;max-width:800px}h1{font-size:22px}table{border-collapse:collapse}td,th{padding:6px 10px;border-bottom:1px solid #eee;text-align:left}.muted{color:#666;font-size:12px}</style>
+</head><body>
+<h1>Nightly Dashboard (last 24h)</h1>
+<p class="muted">Source: <a href="https://emmettk.herokuapp.com">https://emmettk.herokuapp.com</a> • Window: 2026-03-19T23:38:56.893Z → 2026-03-20T23:38:56.893Z</p>
+<table>
+<tr><th>Metric</th><th>Value</th></tr>
+<tr><td>Readings</td><td>571</td></tr>
+<tr><td>&lt;70 mg/dL</td><td>71</td></tr>
+<tr><td>&lt;54 mg/dL</td><td>35</td></tr>
+<tr><td>TIR 70–180</td><td>77.6%</td></tr>
+<tr><td>TBR &lt;70</td><td>12.4%</td></tr>
+<tr><td>Predicted ≤ 70</td><td>24.3% (n=321)</td></tr>
+<tr><td>Pump comm error</td><td>14.6% (n=321)</td></tr>
+</table>
+<p class="muted">Updated: 2026-03-20T23:38:56.893Z</p>
+<script>fetch('metrics.json').then(r=>r.json()).then(j=>console.log(j)).catch(()=>{});</script>
+</body></html>

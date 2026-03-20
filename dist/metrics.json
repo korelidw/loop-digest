@@ -1,11 +1,21 @@
 {
-  "window_start": "2026-03-17T02:14:10Z",
-  "total_readings": 611,
-  "lt70_count": 2,
-  "lt54_count": 0,
-  "tir_pct": 73.3,
-  "tbr_pct": 0.3,
-  "loop_samples": 292,
-  "predicted_low_pct": 7.0,
-  "pump_comm_error_pct": 0.0
+  "window": {
+    "start": "2026-03-19T23:38:56.893Z",
+    "end": "2026-03-20T23:38:56.893Z"
+  },
+  "counts": {
+    "lt70": 71,
+    "lt54": 35,
+    "totalReadings": 571
+  },
+  "headline": {
+    "TIR_70_180_pct": 77.6,
+    "TBR_lt70_pct": 12.4
+  },
+  "predicted_low_pct": 24.3,
+  "pump_comm_error_pct": 14.6,
+  "samples": {
+    "predictions": 321,
+    "devicestatus": 321
+  }
 }
