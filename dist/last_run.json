@@ -1,0 +1,26 @@
+{
+  "metrics": {
+    "window": {
+      "start": "2026-03-19T23:38:56.893Z",
+      "end": "2026-03-20T23:38:56.893Z"
+    },
+    "counts": {
+      "lt70": 71,
+      "lt54": 35,
+      "totalReadings": 571
+    },
+    "headline": {
+      "TIR_70_180_pct": 77.6,
+      "TBR_lt70_pct": 12.4
+    },
+    "predicted_low_pct": 24.3,
+    "pump_comm_error_pct": 14.6,
+    "samples": {
+      "predictions": 321,
+      "devicestatus": 321
+    }
+  },
+  "summary": {
+    "text": "Alert — <70: 71 (<54: 35); Comm errs: 14.6%. TIR 77.6%, TBR 12.4%."
+  }
+}
