@@ -1,39 +1,28 @@
+
 <!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Loop Digest - Nightly Dashboard</title>
-  <style>
-    body { font: 16px/1.4 -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin: 2rem; color: #222; }
-    h1 { font-size: 1.4rem; margin-bottom: .5rem; }
-    .muted { color: #666; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-top: 1rem; }
-    .card { border: 1px solid #eee; border-radius: 8px; padding: 1rem; }
-    .k { font-size: .85rem; color: #666; }
-    .v { font-size: 1.4rem; font-weight: 600; }
-  </style>
-</head>
-<body>
-  <h1>Nightly Dashboard</h1>
-  <div class="muted">Last 24 hours</div>
-  <div id="grid" class="grid"></div>
-  <script>
-    fetch('./metrics.json').then(r => r.json()).then(m => {
-      const items = [
-        {k:'Readings', v: m.total_readings},
-        {k:'<70 count', v: m.lt70_count},
-        {k:'<54 count', v: m.lt54_count},
-        {k:'TIR (70-180)', v: m.tir_pct + '%'},
-        {k:'TBR (<70)', v: m.tbr_pct + '%'},
-        {k:'Loop samples', v: m.loop_samples},
-        {k:'Pred ≤70', v: m.predicted_low_pct + '%'},
-        {k:'Pump comm errors', v: m.pump_comm_error_pct + '%'},
-        {k:'Window start (UTC)', v: m.window_start}
-      ];
-      const grid = document.getElementById('grid');
-      grid.innerHTML = items.map(i => `<div class="card"><div class="k">${i.k}</div><div class="v">${i.v}</div></div>`).join('');
-    });
-  </script>
-</body>
+<html lang='en'>
+<meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'>
+<title>Loop Digest – Nightly Dashboard</title>
+<style>
+body{font-family: -apple-system, system-ui, Segoe UI, Roboto, sans-serif; margin:24px;}
+.card{border:1px solid #e3e3e3; border-radius:12px; padding:16px; max-width:720px;}
+.kv{display:grid; grid-template-columns: 1fr auto; gap:8px;}
+.kv div{padding:4px 0; border-bottom:1px dashed #eee;}
+.kv div:last-child{border-bottom:none;}
+.small{color:#666; font-size:12px}
+</style>
+<div class='card'>
+  <h2>Nightly Mini-Flag (last 24h)</h2>
+  <div class='small'>Nightscout: <a href='https://emmettk.herokuapp.com' target='_blank' rel='noreferrer'>emmettk.herokuapp.com</a></div>
+  <div class='small'>Window: 2026-03-22T02:10:06Z → 2026-03-23T02:10:06Z (UTC)</div>
+  <div class='kv'>
+    <div>Readings</div><div><b>561</b></div>
+    <div>Low &lt;70 mg/dL</div><div><b>12</b></div>
+    <div>Low &lt;54 mg/dL</div><div><b>4</b></div>
+    <div>TIR 70–180</div><div><b>59.7%</b></div>
+    <div>TBR &lt;70</div><div><b>2.1%</b></div>
+  </div>
+  <p class='small'>Predicted ≤ suspend and comm-error metrics unavailable (no recent devicestatus).</p>
+</div>
 </html>
