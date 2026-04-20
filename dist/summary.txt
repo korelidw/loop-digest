@@ -1,1 +1,6 @@
-Alert — <70: 71 (<54: 35); Comm errs: 14.6%. TIR 77.6%, TBR 12.4%.
+Weekly Safety Digest 2026-04-06–2026-04-20 | Readings: 9978 | Coverage: 100%
+TIR 70–180: 63.8% | TBR <70: 0.7% | TBR <54: 0% | TAR >180: 35.5% | TAR >250: 10.7%
+CV: 33.9% | GRI: 11.32 | LBGI: 1.88 | HBGI: 9.44
+Corrections: 1479 | Ineffective: 64.7% | Overshoot: 6.1%
+Loop cycles: 4203 | ZeroBasal(no-low-pred): 1999 | AB enacted: 1600 | Reliability failures: 167
+Possible missed carb logs: 148

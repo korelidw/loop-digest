@@ -1,11 +1,16 @@
 {
-  "window_start": "2026-03-21T02:00:34Z",
-  "total_readings": 594,
-  "lt70_count": 70,
-  "lt54_count": 9,
-  "tir_pct": 72.1,
-  "tbr_pct": 11.8,
-  "loop_samples": 275,
-  "predicted_low_pct": 0.0,
-  "pump_comm_error_pct": 0.0
+  "window": "2026-04-06 to 2026-04-20",
+  "durationDays": 14,
+  "coverage": 1,
+  "count": 9978,
+  "TIR_pct": 63.8,
+  "TBR_lt70_pct": 0.7,
+  "TBR_lt54_pct": 0,
+  "TAR_gt180_pct": 35.5,
+  "TAR_gt250_pct": 10.7,
+  "CV": 33.9,
+  "GRI": 11.32,
+  "LBGI": 1.88,
+  "HBGI": 9.44,
+  "possibleMissedCarbs": 148
 }
