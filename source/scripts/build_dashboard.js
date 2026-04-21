@@ -323,6 +323,51 @@ if(reliabilitySparkSvgRaw){
   fs.writeFileSync(path.join(distDir,'reliability_spark.svg'), reliabilitySparkSvgRaw, 'utf8');
 }
 
+// Day-of-week Pred≤suspend bar chart
+function buildDayOfWeekSvg(days){
+  const DOW_LABELS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const buckets={};
+  (days||[]).forEach(d=>{
+    if(!d.day||d.pctPredLeSuspend==null) return;
+    const dt=new Date(d.day+'T12:00:00');
+    const dow=dt.getDay();
+    if(!buckets[dow]) buckets[dow]=[];
+    buckets[dow].push(d.pctPredLeSuspend);
+  });
+  const avgs=DOW_LABELS.map((_,i)=>{ const vals=buckets[i]||[]; return vals.length? vals.reduce((s,v)=>s+v,0)/vals.length : null; });
+  if(!avgs.some(v=>v!=null)) return '';
+  const barW=38,gap=6,padLeft=30,padTop=22,padBottom=28,padRight=10,innerH=80;
+  const totalW=padLeft+7*(barW+gap)-gap+padRight;
+  const totalH=padTop+innerH+padBottom;
+  const maxVal=Math.max(35,Math.ceil(Math.max(...avgs.filter(v=>v!=null))/5)*5);
+  const refLineY=padTop+innerH-(10/maxVal)*innerH;
+  let bars='',yTicks='';
+  [10,20,Math.round(maxVal)].filter(v=>v<=maxVal).forEach(v=>{
+    const yPos=padTop+innerH-(v/maxVal)*innerH;
+    yTicks+=`<line x1="${padLeft-3}" x2="${padLeft}" y1="${yPos}" y2="${yPos}" stroke="#ccc" stroke-width="1"/><text x="${padLeft-5}" y="${yPos+3}" text-anchor="end" font-size="8" fill="#888">${v}</text>`;
+  });
+  DOW_LABELS.forEach((label,i)=>{
+    const val=avgs[i];
+    const x=padLeft+i*(barW+gap);
+    const isWeekend=(i===0||i===6);
+    if(val==null){
+      bars+=`<rect x="${x}" y="${padTop+innerH-4}" width="${barW}" height="4" fill="#e0e0e0" rx="2"/><text x="${x+barW/2}" y="${padTop+innerH+14}" text-anchor="middle" font-size="9" fill="#aaa">${label}</text>`;
+      return;
+    }
+    const barH=Math.max(4,(val/maxVal)*innerH);
+    const y=padTop+innerH-barH;
+    let fill='#1abc9c';
+    if(val>=25) fill='#e74c3c';
+    else if(val>=10) fill='#f39c12';
+    const cn=avgs[i-1]!=null||avgs[i+1]!=null ? `(${buckets[i]?buckets[i].length:0}d)`:''; // sample count
+    bars+=`<rect x="${x}" y="${y}" width="${barW}" height="${barH}" fill="${fill}" rx="3" opacity="${isWeekend?'1':'0.8'}" title="${label}: ${val.toFixed(1)}%"/>`;
+    bars+=`<text x="${x+barW/2}" y="${y-4}" text-anchor="middle" font-size="9" fill="#333" font-weight="${val>=25?'700':'400'}">${Math.round(val)}%</text>`;
+    bars+=`<text x="${x+barW/2}" y="${padTop+innerH+14}" text-anchor="middle" font-size="9" fill="${isWeekend?'#c0392b':'#444'}" font-weight="${isWeekend?'600':'400'}">${label}</text>`;
+  });
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${totalW} ${totalH}" role="img" aria-label="Pred ≤ suspend by day of week (14-day averages)"><style>text{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;}</style><text x="${padLeft}" y="14" font-size="10" font-weight="600" fill="#333">Pred ≤ suspend by day of week (14d avg)</text>${yTicks}<line x1="${padLeft}" x2="${totalW-padRight}" y1="${padTop+innerH}" y2="${padTop+innerH}" stroke="#e0e0e0" stroke-width="1"/><line x1="${padLeft}" x2="${totalW-padRight}" y1="${refLineY}" y2="${refLineY}" stroke="#1abc9c" stroke-width="1" stroke-dasharray="3,3" opacity="0.7"/><text x="${totalW-padRight-2}" y="${refLineY-2}" text-anchor="end" font-size="8" fill="#1abc9c">10%</text>${bars}</svg>`;
+}
+const dowPredSvgRaw = buildDayOfWeekSvg(sentinelDays);
+
 const latestReliability = sentinelDays.length? sentinelDays[sentinelDays.length-1] : null;
 function reliabilityLevel(value, ranges){
   if(value==null || Number.isNaN(value)) return 'muted';
@@ -721,6 +766,37 @@ const whatToCheckHtml = (()=>{
   }catch{ return ''; }
 })();
 
+// Dawn-effect anomaly callout (auto-triggers when morning IOB>1.5 is >=40pp more ineffective than overnight)
+const dawnEffectCardHtml = (()=>{
+  try{
+    const mGt=(correctionGrid['gt']||{}).morning, oGt=(correctionGrid['gt']||{}).overnight;
+    if(!mGt||!oGt) return '';
+    const mI=mGt.pctIneffective2h, oI=oGt.pctIneffective2h;
+    const mN=mGt.n||0, oN=oGt.n||0;
+    if(mN<8||oN<5||mI==null||oI==null) return '';
+    const gap=mI-oI;
+    if(gap<40) return '';
+    return `<div class="card" style="border-left:4px solid #7c3aed;margin-bottom:10px"><strong style="color:#7c3aed">⚠ Morning anomaly — dawn-effect resistance</strong><div style="font-size:12px;margin-top:6px;line-height:1.5">Morning IOB&gt;1.5: <strong>${Math.round(mI)}% ineffective</strong> (n=${mN}) vs Overnight IOB&gt;1.5: <strong>${Math.round(oI)}% ineffective</strong> (n=${oN}) — gap of <strong>${Math.round(gap)}pp</strong>. Even at high IOB where Loop delivers freely, morning corrections fail far more than overnight — this is inconsistent with a constraint or ISF explanation and points to <strong>physiological dawn-effect insulin resistance</strong> (cortisol/GH surge 03:00–07:00, not addressable by a single ISF change).</div><div class="muted" style="margin-top:4px">Do not act on this until Q5 (overnight basal) is stable. Accumulate fasting morning corrections (no breakfast bolus ±2h, no constraint active) before drawing conclusions.</div></div>`;
+  }catch{return ''}
+})();
+
+// Evening ISF clean-trial protocol card (Q3 · Q10 — explicitly requested by Analyst/Researcher 04/20)
+const eveningProtocolCardHtml = (()=>{
+  try{
+    const eMid=(correctionGrid['mid']||{}).evening||{};
+    if(!eMid.n) return '';
+    const pctI=eMid.pctIneffective2h!=null?Math.round(eMid.pctIneffective2h):null;
+    const med2=eMid.medDrop2h!=null?Math.round(eMid.medDrop2h):null;
+    const isf=(correctionCtx.experiments&&correctionCtx.experiments.isfRun)||null;
+    const isfN=isf&&isf.recent?(isf.recent.n||'?'):'?';
+    const isfPred=isf&&isf.recent?isf.recent.pctPredLeSuspend0_180:null;
+    const nullMsg=(isfPred!=null&&isfPred>=100)?`🚫 ISF +10% · 14:00–16:30: NULL — 100% Pred≤suspend-gated (n=${isfN}). Zero usable ISF signal; redesign or abandon this window.`:'';
+    const lvl=pctI!=null?(pctI>=75?'high':(pctI>=50?'med':'low')):'muted';
+    const med2Lvl=med2!=null&&med2>0?'low':'high';
+    return `<div class="card" style="border-left:4px solid #0891b2;margin-bottom:10px"><strong style="color:#0891b2">Evening ISF Clean-Trial Protocol</strong> <span style="font-weight:normal;font-size:11px;color:#555">(Q3 · Q10) · 17:00–20:00 CT · IOB 0.5–1.5 · No food ±2h · Pred≤suspend NOT active at correction time</span><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><span class="reliability-chip ${lvl}"><span>Evening IOB 0.5–1.5 baseline (n)</span><strong>${eMid.n}</strong></span><span class="reliability-chip ${lvl}"><span>%ineffective @2h</span><strong>${pctI!=null?pctI+'%':'n/a'}</strong></span><span class="reliability-chip ${med2Lvl}"><span>Median 2h Δ</span><strong>${med2!=null?(med2>0?'↓ '+med2:'↑ '+Math.abs(med2))+' mg/dL':'n/a'}</strong></span><span class="reliability-chip muted"><span>Clean trials target</span><strong>≥ 3</strong></span></div><div style="font-size:12px;line-height:1.6;margin-top:8px"><strong>Success criteria:</strong><br>≥2/3 clean trials Δ@2h &gt;20 mg/dL → <span style="color:#0891b2">constraints are the bottleneck</span> (ISF adequate).<br>≥2/3 clean trials Δ@2h &lt;20 mg/dL → <span style="color:#d97706">ISF-too-weak hypothesis gains weight</span> (discuss with clinician before any setting change).</div>${nullMsg?`<div style="margin-top:8px;padding:6px 10px;background:#fef3c7;border-radius:6px;font-size:11px">${esc(nullMsg)}</div>`:''}</div>`;
+  }catch{return ''}
+})();
+
 // Scenario section shell with toggle controls
 const scenarioSectionHtml = `<div class="scenario-shell">
   <input type="radio" name="scenario-mode" id="scenario-compact" checked>
@@ -1039,6 +1115,7 @@ const html = `<!doctype html>
       return `<div class=\"sub-bar\" title=\"Last 24h: red = possible missed-carb rise; blue = logged carbs\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"${width}\" height=\"${height}\">${carbDots}${circles}<text x=\"${width-padR}\" y=\"20\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">24h</text></svg></div>`;
     }catch{return ''}
   })()}
+  ${dowPredSvgRaw ? `<div class="sub-bar" style="margin-top:10px" title="Day-of-week Pred≤suspend averages — shows weekend behavioral pattern vs weekday baseline">${dowPredSvgRaw}<div style="font-size:10px;color:#666;margin-top:2px">Bars: green &lt;10%, amber 10–25%, red ≥25%. Dashed line = 10% weekday target. Weekday labels in gray, weekend in red.</div></div>` : ''}
   <details style="margin-top:6px">
     <summary><strong>Reliability & safety details</strong> (daily Pred ≤ suspend, Comm errors, and 14‑day sparkline)</summary>
     <div class="sentinel-header" style="margin-top:6px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">
@@ -1104,6 +1181,8 @@ ${(()=>{ // Experiment peek mini-card under Most Actionable
   return `<div class="card" style="border-left:4px solid #0d6efd"><div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap"><h3 style="margin:0">Experiment peek</h3><div class="muted">${esc(xp.context||'Corrections — Midday · IOB<0.5')} (recent vs 7d baseline)</div></div><div class="exp-chips" style="margin-top:8px">${chips}</div></div>`;
 })()}
 ${whatToCheckHtml}
+${dawnEffectCardHtml}
+${eveningProtocolCardHtml}
 <div class="row">
  <div class="card"><h3>AGP (14‑day)</h3>
   ${agpSvg || `<div class="muted">AGP unavailable</div>`}
