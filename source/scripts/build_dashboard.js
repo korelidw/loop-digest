@@ -368,6 +368,36 @@ function buildDayOfWeekSvg(days){
 }
 const dowPredSvgRaw = buildDayOfWeekSvg(sentinelDays);
 
+// Day-of-week context annotation: latest day's actual vs historical DOW avg
+function buildDowContextHtml(days){
+  const DOW_LABELS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const buckets={};
+  (days||[]).forEach(d=>{
+    if(!d.day||d.pctPredLeSuspend==null) return;
+    const dt=new Date(d.day+'T12:00:00');
+    const dow=dt.getDay();
+    if(!buckets[dow]) buckets[dow]=[];
+    buckets[dow].push(d.pctPredLeSuspend);
+  });
+  const latest=(days||[]).length ? days[days.length-1] : null;
+  if(!latest||latest.pctPredLeSuspend==null) return '';
+  const latestDt=new Date(latest.day+'T12:00:00');
+  const todayDow=latestDt.getDay();
+  const todayVals=buckets[todayDow]||[];
+  const dowAvg=todayVals.length ? todayVals.reduce((s,v)=>s+v,0)/todayVals.length : null;
+  if(dowAvg==null) return '';
+  const dowLabel=DOW_LABELS[todayDow];
+  const actual=latest.pctPredLeSuspend;
+  const diff=actual-dowAvg;
+  const diffStr=(diff>0?'+':'')+Math.round(diff)+'pp vs '+dowLabel+' avg';
+  const statusColor=Math.abs(diff)>6?'#b45309':'#059669';
+  const isWeekend=todayDow===0||todayDow===6;
+  const isMonday=todayDow===1;
+  const context=isMonday?' · Mon is a behavioral transition day — carryover from weekend often elevates Pred≤suspend even with normal basal':(isWeekend?' · Weekend — elevated Pred≤suspend expected from unlogged carbs/behavioral disruption':'');
+  return `<div style="font-size:11px;color:#444;margin-top:5px;padding:5px 9px;background:#f7f9fc;border-radius:6px;border:1px solid #dce8f7;line-height:1.5">📅 <strong>${esc(dowLabel)} (${esc(latest.day)}):</strong> <strong>${Math.round(actual)}%</strong> Pred≤suspend · ${esc(dowLabel)} 14d avg: <strong>${Math.round(dowAvg)}%</strong> (n=${todayVals.length} days) · <span style="color:${statusColor};font-weight:600">${diffStr}</span>${context}</div>`;
+}
+const dowContextHtml = buildDowContextHtml(sentinelDays);
+
 const latestReliability = sentinelDays.length? sentinelDays[sentinelDays.length-1] : null;
 function reliabilityLevel(value, ranges){
   if(value==null || Number.isNaN(value)) return 'muted';
@@ -507,7 +537,12 @@ function gateChipHtml(key){
   const g = gatingState[key];
   if(!g || g.value==null) return '';
   const val = fmtPct(g.value);
-  return `<span class="gate-chip ${g.level}" title="${esc(g.label)}: ${val} (${g.label} gate)"><span>${esc(g.label)}</span><strong>${esc(val)}</strong></span>`;
+  const tipMap = {
+    pred: `Pred ≤ suspend (14d avg): ${val}. % of Loop cycles where the predicted glucose touches/crosses the suspend threshold. Green <10%: headroom for evaluating ISF/basal levers. Amber 10–25%: active constraint pressure — corrections may be gated, not ISF-limited. Red ≥25%: constraint-dominated; wait for headroom before making setting changes.`,
+    ab: `AB cadence (14d avg): ${val}. % of Loop cycles with Automatic Bolus delivery. Green <15%: low algorithmic pressure. Amber 15–30%: Loop compensating frequently. Red >30%: high cadence — sustained high-glucose or Pred≤suspend pressure driving aggressive automated delivery.`,
+    max: `Max basal hits (14d avg): ${val}. % of Loop cycles hitting the max basal rate cap. Green 0%: cap is not a binding constraint. Amber 0–5%: occasional cap hits. Red ≥5%: max basal ceiling is limiting delivery — raising it may help.`
+  };
+  return `<span class="gate-chip ${g.level}" title="${esc(tipMap[key]||g.label+': '+val)}"><span>${esc(g.label)}</span><strong>${esc(val)}</strong></span>`;
 }
 function gateChipRow(){
   return `<div class="gate-row">${['pred','ab','max'].map(gateChipHtml).join('')}</div>`;
@@ -777,6 +812,21 @@ const dawnEffectCardHtml = (()=>{
     const gap=mI-oI;
     if(gap<40) return '';
     return `<div class="card" style="border-left:4px solid #7c3aed;margin-bottom:10px"><strong style="color:#7c3aed">⚠ Morning anomaly — dawn-effect resistance</strong><div style="font-size:12px;margin-top:6px;line-height:1.5">Morning IOB&gt;1.5: <strong>${Math.round(mI)}% ineffective</strong> (n=${mN}) vs Overnight IOB&gt;1.5: <strong>${Math.round(oI)}% ineffective</strong> (n=${oN}) — gap of <strong>${Math.round(gap)}pp</strong>. Even at high IOB where Loop delivers freely, morning corrections fail far more than overnight — this is inconsistent with a constraint or ISF explanation and points to <strong>physiological dawn-effect insulin resistance</strong> (cortisol/GH surge 03:00–07:00, not addressable by a single ISF change).</div><div class="muted" style="margin-top:4px">Do not act on this until Q5 (overnight basal) is stable. Accumulate fasting morning corrections (no breakfast bolus ±2h, no constraint active) before drawing conclusions.</div></div>`;
+  }catch{return ''}
+})();
+
+// ISF 14:00–16:30 experiment null card — standalone prominent alert when experiment is ≥90% constraint-gated
+// (Analyst 04/20 + Researcher 04/20 explicitly request this as a Code action)
+const isfExperimentNullCardHtml = (()=>{
+  try{
+    const isf=(correctionCtx&&correctionCtx.experiments&&correctionCtx.experiments.isfRun)||null;
+    if(!isf||!isf.recent) return '';
+    const isfPred=isf.recent.pctPredLeSuspend0_180;
+    if(isfPred==null||isfPred<90) return '';
+    const n=isf.recent.n||'?';
+    const win=isf.window||'14:00–16:30';
+    const med2=isf.recent.medDrop2h!=null?Math.round(isf.recent.medDrop2h):null;
+    return `<div class="card" style="border-left:4px solid #dc2626;background:#fef2f2;margin-bottom:10px"><strong style="color:#dc2626">🚫 ISF Experiment NULL — Redesign Required</strong> <span style="font-size:11px;color:#666;font-weight:normal">(${esc(win)})</span><div style="font-size:12px;margin-top:8px;line-height:1.65"><strong>Pred≤suspend during window: ${Math.round(isfPred)}%</strong> (n=${n} correction events) — every event in this window is constraint-gated. Loop is withholding delivery on all observed correction opportunities; no usable ISF signal can be extracted.<br><br>Root cause: midday unlogged meals likely drive glucose forecasts high, triggering Pred≤suspend through the afternoon and fully confounding this window. This is not an ISF measurement — it is a constraint measurement.<br><br><strong>Recommended next step:</strong> Shift clean-trial evaluation to the <em>Evening window (17:00–20:00)</em> using the protocol card below. Per Researcher 2026-04-20: target IOB 0.5–1.5, no food ±2h, Pred≤suspend NOT active at correction time, target ≥3 clean trials before drawing ISF direction conclusions.</div></div>`;
   }catch{return ''}
 })();
 
@@ -1115,7 +1165,7 @@ const html = `<!doctype html>
       return `<div class=\"sub-bar\" title=\"Last 24h: red = possible missed-carb rise; blue = logged carbs\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"${width}\" height=\"${height}\">${carbDots}${circles}<text x=\"${width-padR}\" y=\"20\" font-size=\"9\" fill=\"#666\" text-anchor=\"end\">24h</text></svg></div>`;
     }catch{return ''}
   })()}
-  ${dowPredSvgRaw ? `<div class="sub-bar" style="margin-top:10px" title="Day-of-week Pred≤suspend averages — shows weekend behavioral pattern vs weekday baseline">${dowPredSvgRaw}<div style="font-size:10px;color:#666;margin-top:2px">Bars: green &lt;10%, amber 10–25%, red ≥25%. Dashed line = 10% weekday target. Weekday labels in gray, weekend in red.</div></div>` : ''}
+  ${dowPredSvgRaw ? `<div class="sub-bar" style="margin-top:10px" title="Day-of-week Pred≤suspend averages — shows weekend behavioral pattern vs weekday baseline">${dowPredSvgRaw}<div style="font-size:10px;color:#666;margin-top:2px">Bars: green &lt;10%, amber 10–25%, red ≥25%. Dashed line = 10% weekday target. Weekday labels in gray, weekend in red.</div>${dowContextHtml}</div>` : ''}
   <details style="margin-top:6px">
     <summary><strong>Reliability & safety details</strong> (daily Pred ≤ suspend, Comm errors, and 14‑day sparkline)</summary>
     <div class="sentinel-header" style="margin-top:6px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">
@@ -1182,6 +1232,7 @@ ${(()=>{ // Experiment peek mini-card under Most Actionable
 })()}
 ${whatToCheckHtml}
 ${dawnEffectCardHtml}
+${isfExperimentNullCardHtml}
 ${eveningProtocolCardHtml}
 <div class="row">
  <div class="card"><h3>AGP (14‑day)</h3>
@@ -1268,6 +1319,7 @@ ${eveningProtocolCardHtml}
   <div class="card dinner-card"><h3>Dinner Lens</h3>
     <table><thead><tr><th>Window</th><th>Lead bin</th><th>n</th><th>Start BG (med/IQR)</th><th>ΔPeak (med)</th><th>T→180 (med)</th><th>Start trend</th><th>%>180</th><th>Median peak</th></tr></thead><tbody>${dinnerRows}</tbody></table>
     <div class="muted">Window fixed at 17:30–20:00; requires logged carbs ≥10g and bolus within −60/+30 min.</div>
+    ${(()=>{ const rows=orderedBucketEntries(mealTiming.dinner||{}).filter(([bin,v])=>v&&v.n); const total=rows.reduce((s,[,v])=>s+(v.n||0),0); if(!total) return '<div class="muted" style="margin-top:4px;font-size:11px">⚠ No dinner meals met the filters this window. Ensure carbs ≥10g are logged and bolus is within −60/+30 min of meal start.</div>'; if(total<6) return `<div class="muted" style="margin-top:4px;font-size:11px">⚠ Thin dinner sample (n=${total}). Stats are directional only — wait for ≥6 logged dinners before drawing conclusions.</div>`; return ''; })()}
     <div class="heatmap-interpretation">
       <h4>How to read</h4>
       <ul>
