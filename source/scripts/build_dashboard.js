@@ -368,6 +368,94 @@ function buildDayOfWeekSvg(days){
 }
 const dowPredSvgRaw = buildDayOfWeekSvg(sentinelDays);
 
+// --- Pred≤suspend Streak Banner ---
+function computeStreakEnd(days, field, threshold) {
+  let streak = 0;
+  for (let i = days.length - 1; i >= 0; i--) {
+    if ((days[i][field] || 0) >= threshold) streak++;
+    else break;
+  }
+  return streak;
+}
+const streakPred15 = computeStreakEnd(sentinelDays, 'pctPredLeSuspend', 15);
+const streakBannerHtml = (function() {
+  if (streakPred15 < 3) return '';
+  const lastDay = sentinelDays.length ? sentinelDays[sentinelDays.length - 1] : null;
+  const currentPct = lastDay ? Math.round(lastDay.pctPredLeSuspend || 0) : null;
+  const isRed = streakPred15 >= 5;
+  const borderCol = isRed ? '#e74c3c' : '#f39c12';
+  const bgCol = isRed ? '#fef2f2' : '#fffbeb';
+  const levelTxt = isRed ? 'RED \u25CF' : 'AMBER \u25CF';
+  const levelColor = isRed ? '#c23616' : '#b27100';
+  const streakEntries = sentinelDays.slice(-streakPred15);
+  const streakLine = streakEntries.map(d => `${d.day}: ${Math.round(d.pctPredLeSuspend || 0)}%`).join(' \u2192 ');
+  let lastLowDay = null;
+  for (let i = sentinelDays.length - streakPred15 - 1; i >= 0; i--) {
+    if ((sentinelDays[i].pctPredLeSuspend || 0) < 15) { lastLowDay = sentinelDays[i]; break; }
+  }
+  const pillCls = isRed ? 'red' : 'orange';
+  const lastLowHtml = lastLowDay
+    ? `<div style="font-size:11px;color:#666;margin-top:4px">Last below 15%: ${esc(lastLowDay.day)} (${Math.round(lastLowDay.pctPredLeSuspend || 0)}%). Streak now ${streakPred15} consecutive days above threshold.</div>`
+    : '';
+  return `<div style="border:2px solid ${borderCol};background:${bgCol};border-radius:10px;padding:12px;margin-bottom:12px">
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+    <strong style="font-size:14px;color:${levelColor}">${levelTxt} Pred \u2264 suspend elevated \u2014 ${streakPred15} consecutive days</strong>
+    ${currentPct != null ? `<span class="pill ${pillCls}">${currentPct}% today</span>` : ''}
+  </div>
+  <div style="font-size:12px;color:#444;margin:5px 0 3px;font-family:monospace">${esc(streakLine)}</div>
+  ${lastLowHtml}
+  <div style="font-size:11px;color:#555;margin-top:7px;padding-top:7px;border-top:1px solid ${borderCol}55;font-style:italic">Q5 basal escalation criterion met (signals &lt;10 AND Pred\u2264suspend &gt;15% on behavioral-quiet Friday). Formal overnight pre/post split is P0. Do NOT adjust basal before reviewing the overnight split.</div>
+</div>`;
+})();
+
+// --- Pred≤suspend Time-block decomposition (00–06 / 06–12 / 12–18 / 18–24) ---
+function buildTimeBlockChart(hourly) {
+  const data = Array.isArray(hourly) ? hourly : [];
+  if (!data.length) return '';
+  const blocks = [
+    { label: '00\u201306', hours: [0,1,2,3,4,5], sublabel: 'Overnight' },
+    { label: '06\u201312', hours: [6,7,8,9,10,11], sublabel: 'Morning' },
+    { label: '12\u201318', hours: [12,13,14,15,16,17], sublabel: 'Afternoon' },
+    { label: '18\u201324', hours: [18,19,20,21,22,23], sublabel: 'Evening' }
+  ];
+  const blockVals = blocks.map(b => {
+    const vals = b.hours.map(h => data[h] && data[h].pctPredLeSuspend != null ? data[h].pctPredLeSuspend : null).filter(v => v !== null);
+    return vals.length ? vals.reduce((a,x) => a+x, 0) / vals.length : null;
+  });
+  const validVals = blockVals.filter(v => v !== null);
+  if (!validVals.length) return '';
+  const width = 380, height = 110;
+  const padL = 36, padR = 12, padT = 16, padB = 44;
+  const innerW = width - padL - padR;
+  const innerH = height - padT - padB;
+  const maxVal = Math.max(35, Math.ceil(Math.max(...validVals) / 5) * 5);
+  const slotW = innerW / 4;
+  const barW = Math.floor(slotW * 0.55);
+  const scaleY = v => padT + innerH - (v / maxVal) * innerH;
+  let svgContent = '';
+  blockVals.forEach((val, i) => {
+    const x = padL + i * slotW + (slotW - barW) / 2;
+    const cx = (x + barW / 2).toFixed(1);
+    if (val !== null) {
+      const barH = Math.max(2, (val / maxVal) * innerH);
+      const y = padT + innerH - barH;
+      const fill = val >= 25 ? '#e74c3c' : val >= 15 ? '#f39c12' : '#1abc9c';
+      svgContent += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW}" height="${barH.toFixed(1)}" fill="${fill}" rx="2" opacity="0.9"/>`;
+      svgContent += `<text x="${cx}" y="${(y - 3).toFixed(1)}" text-anchor="middle" font-size="10" fill="${fill}" font-weight="700">${Math.round(val)}%</text>`;
+    }
+    svgContent += `<text x="${cx}" y="${(padT + innerH + 14).toFixed(1)}" text-anchor="middle" font-size="11" fill="#333" font-weight="600">${blocks[i].label}</text>`;
+    svgContent += `<text x="${cx}" y="${(padT + innerH + 27).toFixed(1)}" text-anchor="middle" font-size="9" fill="#777">${blocks[i].sublabel}</text>`;
+  });
+  const y15 = scaleY(15).toFixed(1);
+  const y25 = scaleY(25).toFixed(1);
+  svgContent += `<line x1="${padL}" x2="${width - padR}" y1="${y15}" y2="${y15}" stroke="#f39c12" stroke-width="1" stroke-dasharray="3,2"/><text x="${padL - 3}" y="${(+y15 + 3).toFixed(0)}" text-anchor="end" font-size="8" fill="#f39c12">15%</text>`;
+  svgContent += `<line x1="${padL}" x2="${width - padR}" y1="${y25}" y2="${y25}" stroke="#e74c3c" stroke-width="1" stroke-dasharray="3,2"/><text x="${padL - 3}" y="${(+y25 + 3).toFixed(0)}" text-anchor="end" font-size="8" fill="#e74c3c">25%</text>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" style="width:100%;max-width:400px;height:auto" role="img" aria-label="Pred \u2264 suspend by 6-hour block">
+    <style>text{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}</style>${svgContent}
+  </svg>`;
+}
+const timeBlockChartSvg = buildTimeBlockChart(overlayHourly);
+
 // Day-of-week context annotation: latest day's actual vs historical DOW avg
 function buildDowContextHtml(days){
   const DOW_LABELS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
@@ -414,7 +502,9 @@ function reliabilityChip(label,value,ranges){
 const reliabilityChipsHtml = latestReliability
   ? [
       reliabilityChip('Pred ≤ suspend · 24h', latestReliability.pctPredLeSuspend, {med:10, high:25}),
-      reliabilityChip('Comm errors · 24h', latestReliability.pctFailures, {med:10, high:15, exclusiveHigh:true})
+      reliabilityChip('Comm errors · 24h', latestReliability.pctFailures, {med:10, high:15, exclusiveHigh:true}),
+      reliabilityChip('AB cadence · 14d', constraints.automaticBolus && constraints.automaticBolus.pctCyclesWithAB, {med:15, high:30}),
+      reliabilityChip('Max basal hits · 14d', constraints.basal && constraints.basal.pctAtMaxBasal, {med:1, high:5, exclusiveHigh:true})
     ].join('')
   : '';
 
@@ -962,6 +1052,35 @@ const kpiStripHtml = `<div class="kpi-strip">${[
 ].join('')}<div class=\"kpi-meta\">Coverage: ${metrics.meta&&metrics.meta.coverage?(metrics.meta.coverage*100).toFixed(0):'0'}%</div></div>
 <div class=\"kpi-legend muted\" title=\"See memory/shared/definitions.md\">Note: TAR includes Very High (>250). Sums can exceed 100%. Exclusive bins planned next build.</div>`;
 
+// --- Overbasalization Paradox Triad Card ---
+// Triad: Low TBR (algorithm catches lows) + High Pred≤suspend (gating) + High TAR (corrections blocked)
+const overbasalizationCardHtml = (function() {
+  const tbr = nowVals.TBR;
+  const tar = nowVals.TAR;
+  const pred = gatingState.pred.value;
+  if (tbr == null || tar == null || pred == null) return '';
+  const tbrLow   = tbr <= 3;
+  const predHigh = pred >= 20;
+  const tarHigh  = tar >= 30;
+  const triadScore = [tbrLow, predHigh, tarHigh].filter(Boolean).length;
+  if (triadScore < 2) return '';
+  const triadActive = triadScore === 3;
+  const borderCol = triadActive ? '#e74c3c' : '#f39c12';
+  const bgCol     = triadActive ? '#fef2f2' : '#fffbeb';
+  const headerCol = triadActive ? '#c23616' : '#b27100';
+  const badge     = triadActive ? 'ALL 3 CRITERIA MET' : `${triadScore}/3 CRITERIA`;
+  const badgeCls  = triadActive ? 'red' : 'orange';
+  function triadCell(label, displayText, isFlagged, flaggedMsg, okMsg) {
+    const bg = isFlagged ? '#fdecea' : '#ecf9f1';
+    const border = isFlagged ? '#fab1a0' : '#a3e6c3';
+    const col = isFlagged ? '#c23616' : '#0b8457';
+    const icon = isFlagged ? '\u2717' : '\u2713';
+    const msg = isFlagged ? flaggedMsg : okMsg;
+    return `<div style="padding:8px 12px;border-radius:8px;background:${bg};border:1px solid ${border};text-align:center;min-width:90px;flex:1"><div style="font-size:10px;color:#555;margin-bottom:2px">${esc(label)}</div><div style="font-size:22px;font-weight:700;color:${col}">${esc(displayText)}</div><div style="font-size:10px;color:${col}">${icon} ${esc(msg)}</div></div>`;
+  }
+  return `<div style="border:2px solid ${borderCol};background:${bgCol};border-radius:10px;padding:12px;margin-bottom:12px"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px"><strong style="font-size:14px;color:${headerCol}">🔍 AID Overbasalization Signal</strong><span class="pill ${badgeCls}" style="font-size:10px;padding:3px 8px">${badge}</span>${streakPred15 >= 5 ? '<span class="pill red" style="font-size:10px;padding:3px 8px">Q5 ESCALATED</span>' : ''}</div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">${triadCell('TBR \u00b7 hypo rate', tbr + '%', !tbrLow, '\u2191 Actual lows occurring', 'Low \u2014 algorithm catching lows')}${triadCell('Pred \u2264 suspend \u00b7 14d', fmtPct(pred), predHigh, 'Gating corrections', 'Correction headroom open')}${triadCell('TAR \u00b7 >180 \u00b7 14d', tar + '%', tarHigh, 'Corrections blocked', 'In target range')}</div><div style="font-size:11px;color:#555;line-height:1.5"><strong>Paradox:</strong> TBR stays low (algorithm catches predicted lows before they occur) while Pred\u2264suspend gates corrections \u2014 pushing TAR high. The algorithm works <em>too well</em> preventing lows while blocking hypo-corrections clears highs. Consistent with scheduled basal exceeding physiological need (Cowart 2020). <strong>Q5 overnight pre/post split is the P0 next step \u2014 do not adjust basal before reviewing it.</strong></div></div>`;
+})();
+
 // Experiments: restored v0 formatting with chips
 function formatChip(label, value, unit='%'){
   const text = (value==null)? 'n/a' : (unit==='%'? fmtPct(value) : String(value));
@@ -1172,6 +1291,7 @@ const html = `<!doctype html>
       <div class="sentinel-asof">As of ${esc(sentinelStamp)}</div>
     </div>
     <table><thead><tr><th>Day</th><th>Pred ≤ suspend</th><th>Comm errors</th></tr></thead><tbody>${sentinelRows}</tbody></table>
+    ${timeBlockChartSvg ? `<div style="margin-top:14px"><div style="font-size:12px;font-weight:600;color:#333;margin-bottom:4px">Pred \u2264 suspend by 6-hour block (14d hourly avg)</div>${timeBlockChartSvg}<div style="font-size:10px;color:#666;margin-top:2px">Which part of the day drives constraint pressure? Orange \u226515%, Red \u226525%. Key diagnostic for Q5 overnight split.</div></div>` : ''}
     ${reliabilitySparkBlock}
     ${hourlyStripeBlock}
   </details>
@@ -1191,6 +1311,8 @@ const html = `<!doctype html>
   </div>
 </div>
 ${mostActionableHtml}
+${streakBannerHtml}
+${overbasalizationCardHtml}
 ${(()=>{ // High-ineffectiveness banner just under Most Actionable
   try{
     const worst=(correctionCtx.groups||[]).filter(g=> (g.n||0)>=15).slice().sort((a,b)=> (b.pctIneffective2h||0)-(a.pctIneffective2h||0)).slice(0,2);
