@@ -1121,6 +1121,105 @@ const experimentsActiveListHtml = renderExperimentList(experiments.active, 'No a
 const experimentsPastListHtml = renderExperimentList(experiments.past, 'No past experiments logged.');
 const experimentsUpdatedStr = formatLocalTs(experiments.updatedAt);
 
+// --- Evening Block Priority Card ---
+// Surfaces the 6h block decomposition outside the reliability collapsible.
+// Fires when evening (18–24h) is elevated AND dominant vs overnight (key Q5 insight).
+const eveningBlockCardHtml = (function() {
+  const data = Array.isArray(overlayHourly) ? overlayHourly : [];
+  if (!data.length) return '';
+  const blocks = [
+    { label: 'Overnight', sublabel: '00–06', hours: [0,1,2,3,4,5] },
+    { label: 'Morning',   sublabel: '06–12', hours: [6,7,8,9,10,11] },
+    { label: 'Afternoon', sublabel: '12–18', hours: [12,13,14,15,16,17] },
+    { label: 'Evening',   sublabel: '18–24', hours: [18,19,20,21,22,23] }
+  ];
+  const vals = blocks.map(b => {
+    const v = b.hours.map(h => data[h] && data[h].pctPredLeSuspend != null ? data[h].pctPredLeSuspend : null).filter(x => x !== null);
+    return v.length ? v.reduce((a,x) => a+x, 0) / v.length : null;
+  });
+  const overnight = vals[0], evening = vals[3];
+  if (evening == null) return '';
+  const isEveningDominant = overnight != null && evening > overnight + 8;
+  const isEveningRed = evening >= 25;
+  if (!isEveningRed && !isEveningDominant) return '';
+  const diff = overnight != null ? Math.round(evening - overnight) : null;
+  const borderCol = isEveningRed ? '#e74c3c' : '#f39c12';
+  const bgCol     = isEveningRed ? '#fef2f2' : '#fffbeb';
+  const headerCol = isEveningRed ? '#c23616' : '#b27100';
+  const levelWord = isEveningRed ? 'RED ●' : 'AMBER ●';
+  const levelColor= isEveningRed ? '#c23616' : '#b27100';
+  const chips = blocks.map((b, i) => {
+    const v = vals[i];
+    const rv = v != null ? Math.round(v) : null;
+    const color  = v == null ? '#95a5a6' : v >= 25 ? '#e74c3c' : v >= 15 ? '#f39c12' : '#1abc9c';
+    const bg     = v == null ? '#f5f5f5' : v >= 25 ? '#fdecea' : v >= 15 ? '#fffbeb' : '#ecf9f1';
+    const border = v == null ? '#ddd'     : v >= 25 ? '#fab1a0' : v >= 15 ? '#f5d086' : '#a3e6c3';
+    const isEve  = i === 3;
+    const ringStyle = isEve ? `border:2px solid ${border};box-shadow:0 0 0 2px ${borderCol}55;` : `border:1px solid ${border};`;
+    return `<div style="padding:8px 10px;border-radius:8px;background:${bg};${ringStyle}text-align:center;min-width:68px;flex:1"><div style="font-size:9px;color:#555;margin-bottom:1px">${esc(b.label)}</div><div style="font-size:9px;color:#888;margin-bottom:4px">${esc(b.sublabel)}</div><div style="font-size:22px;font-weight:700;color:${color}">${rv != null ? rv + '%' : '–'}</div></div>`;
+  }).join('');
+  const inversionNote = isEveningDominant && diff != null
+    ? `<div style="font-size:11px;color:#444;margin-top:8px;line-height:1.6">⚠ <strong>Structural inversion:</strong> Evening (18–24h) is the <em>highest-constrained</em> block — ${diff}pp above Overnight (${overnight != null ? Math.round(overnight) : '?'}%), which was the Q5 basal reduction target. The overnight window is actually the <em>least constrained</em>. Constraint may be driven by carb cascade accumulating through the school day into the evening window, or by afternoon/evening basal being too strong independently.</div>`
+    : '';
+  return `<div style="border:2px solid ${borderCol};background:${bgCol};border-radius:10px;padding:12px;margin-bottom:12px">
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+    <strong style="font-size:13px;color:${headerCol}">📊 Pred ≤ suspend by 6-hour block (14d avg) — <span style="color:${levelColor}">${levelWord}</span></strong>
+  </div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">${chips}</div>
+  ${inversionNote}
+  <div style="font-size:11px;color:#555;margin-top:8px;padding-top:8px;border-top:1px solid ${borderCol}55">Q5 formal pre/post split must include all 4 blocks — the overnight change's effect on the evening (18–24h) window is unknown. Do not adjust basal based on this pattern alone.</div>
+</div>`;
+})();
+
+// --- Q11 Mode Switch Answer Card ---
+// Dan flagged AB → Basal-Only on 04/26; Researcher answered definitively on 04/27 (LIT-20260427-01).
+// Both modes share the same Pred≤suspend zero-basal gate. Switching does not resolve constraint.
+const q11ModeCardHtml = (function() {
+  const ab = constraints.automaticBolus && constraints.automaticBolus.pctCyclesWithAB;
+  const pred = gatingState.pred.value;
+  if (ab == null) return ''; // Only render if we have constraint data
+  const abStr   = ab != null   ? fmtPct(ab)   : 'n/a';
+  const predStr = pred != null ? fmtPct(pred) : 'n/a';
+  const predLvl = gatingState.pred.level;
+  const maxStr  = gatingState.max && gatingState.max.value != null ? fmtPct(gatingState.max.value) : 'n/a';
+  return `<div style="border-left:4px solid #7c3aed;background:#faf5ff;border-radius:0 8px 8px 0;padding:12px;margin-bottom:12px">
+  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">
+    <strong style="color:#7c3aed;font-size:13px">🔄 Q11: AB → Basal-Only Mode Switch — DEFERRED</strong>
+    <span style="font-size:11px;padding:2px 8px;border-radius:999px;background:#ede9fe;color:#7c3aed">Flagged 04/26 · Resolved 04/27</span>
+  </div>
+  <div style="font-size:12px;color:#333;line-height:1.65;margin-bottom:8px">
+    <strong>Key finding (Researcher 04/27 · LIT-20260427-01 LoopDocs):</strong> Both AB and Temp Basal Only share the <em>identical</em> Pred≤suspend zero-basal safety gate. When predicted glucose touches the suspend threshold, Loop zeroes <em>all</em> automated delivery regardless of mode. With <strong>AB cadence at ${abStr}</strong> and <strong>Pred≤suspend at ${predStr} (14d avg)</strong>, switching delivery strategy does not resolve the constraint — it only changes how insulin is delivered when delivery <em>is</em> allowed.
+  </div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+    <span class="exp-chip high"><span>AB cadence (14d)</span><strong>${abStr}</strong></span>
+    <span class="exp-chip ${predLvl === 'high' ? 'high' : 'med'}"><span>Pred ≤ suspend (14d)</span><strong>${predStr}</strong></span>
+    <span class="exp-chip muted"><span>Max basal hits (14d)</span><strong>${maxStr}</strong></span>
+  </div>
+  <div style="font-size:11px;color:#555;font-style:italic">When Q11 becomes relevant: <em>after</em> Q5 split identifies evening constraint root cause and Pred≤suspend resolves. Only then can a mode switch meaningfully improve correction delivery. Note: Max Basal would need to increase substantially to make Temp Basal Only viable (current 1.45 U/hr ceiling would become the binding constraint). Involve clinical team before any mode change.</div>
+</div>`;
+})();
+
+// --- Priority Actions Card ---
+// Synthesizes the week's P0/P1 actions from Analyst + Researcher (04/27 run).
+const priorityActionsHtml = (function() {
+  const actions = [
+    { label: 'Q5 formal pre/post overnight split (P0 — overdue)', detail: 'Run stratified by all four 6-hour blocks, explicitly including 18–24h. The overnight block may have improved but the evening block (now 35%) is the primary unresolved signal. This is the critical path for all other questions.', badge: 'P0', color: '#e74c3c' },
+    { label: 'Q1 behavioral test: log after-school snack + dinner ≥3 school days (Mon–Thu)', detail: 'Success condition: evening Pred≤suspend < 20% on logged days while basal unchanged. Failure (>25% even logged): escalates structural basal hypothesis independent of behavioral cascade.', badge: 'P1', color: '#f39c12' },
+    { label: 'Q11 mode switch: defer until Q5 resolved', detail: 'AB → Basal-Only does not overcome the shared Pred≤suspend gate. Revisit after Q5 split and constraint reduction. No action needed now.', badge: 'Defer', color: '#7c3aed' }
+  ];
+  const items = actions.map(a =>
+    `<li style="display:flex;gap:10px;align-items:flex-start;padding:7px 0;border-bottom:1px solid #f0f0f0">
+      <span style="min-width:56px;padding:2px 6px;border-radius:6px;background:${a.color}22;color:${a.color};font-size:10px;font-weight:700;text-align:center;margin-top:2px;white-space:nowrap">${esc(a.badge)}</span>
+      <div><div style="font-size:12px;font-weight:600;color:#111">${esc(a.label)}</div><div style="font-size:11px;color:#555;margin-top:2px;line-height:1.45">${esc(a.detail)}</div></div>
+    </li>`
+  ).join('');
+  return `<div class="card" style="border-left:4px solid #0d6efd;margin-bottom:12px">
+    <strong style="font-size:13px">📋 Priority actions — week of 04/28</strong>
+    <ul style="list-style:none;margin:8px 0 0;padding:0">${items}</ul>
+    <div class="muted" style="margin-top:6px;font-size:11px">Directional only — no setting changes until Q5 split is complete and reviewed.</div>
+  </div>`;
+})();
+
 // Build stats + input hash
 const buildStart = Date.now();
 function fileSig(p){ try { const st=fs.statSync(p); return `${path.basename(p)}:${st.size}:${+st.mtime}`; } catch { return `${path.basename(p)}:na`; } }
@@ -1313,6 +1412,9 @@ const html = `<!doctype html>
 ${mostActionableHtml}
 ${streakBannerHtml}
 ${overbasalizationCardHtml}
+${eveningBlockCardHtml}
+${priorityActionsHtml}
+${q11ModeCardHtml}
 ${(()=>{ // High-ineffectiveness banner just under Most Actionable
   try{
     const worst=(correctionCtx.groups||[]).filter(g=> (g.n||0)>=15).slice().sort((a,b)=> (b.pctIneffective2h||0)-(a.pctIneffective2h||0)).slice(0,2);
