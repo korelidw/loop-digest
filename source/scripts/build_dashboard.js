@@ -34,6 +34,8 @@ const latestEntries = entriesPath? (load(entriesPath)||[]) : [];
 const latestTreats = treatsPath? (load(treatsPath)||[]) : [];
 
 const experiments = load(path.join(dataDir,'experiments.json'))||{active:[],past:[]};
+const corrEffectHistPath = path.join(dataDir,'corr_effectiveness_history.json');
+let corrEffectHist = load(corrEffectHistPath) || {series:[]};
 
 function esc(x){ return String(x==null?'':x).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function fmtPct(val){ if(val==null||Number.isNaN(val)) return 'n/a'; const abs=Math.abs(val); const digits = abs<10 ? 1 : 0; return +val.toFixed(digits) + '%'; }
@@ -160,6 +162,26 @@ const correctionGrid = {};
   if(!correctionGrid[keys.row]) correctionGrid[keys.row] = {};
   correctionGrid[keys.row][keys.col] = entry;
 });
+
+// Update correction effectiveness history (Evening IOB 0.5–1.5 trend tracker)
+// This runs at build time so the sparkline card has historical context.
+(function() {
+  try {
+    const eMid = (correctionGrid['mid']||{}).evening;
+    if (!eMid || eMid.n == null || eMid.n < 5) return;
+    corrEffectHist.series = (corrEffectHist.series||[]).filter(s => s.ver !== ver);
+    corrEffectHist.series.push({
+      ver,
+      date: `${ver.slice(4,6)}/${ver.slice(6,8)}`,
+      n: eMid.n,
+      medDrop2h: eMid.medDrop2h != null ? +eMid.medDrop2h.toFixed(1) : null,
+      pctIneff: eMid.pctIneffective2h != null ? +eMid.pctIneffective2h.toFixed(1) : null
+    });
+    corrEffectHist.series = corrEffectHist.series.slice(-14);
+    fs.writeFileSync(corrEffectHistPath, JSON.stringify(corrEffectHist, null, 2), 'utf8');
+  } catch(e) {}
+})();
+
 function hexToRgb(hex){
   const v = hex.replace('#','');
   return {
@@ -1137,29 +1159,39 @@ const eveningBlockCardHtml = (function() {
     const v = b.hours.map(h => data[h] && data[h].pctPredLeSuspend != null ? data[h].pctPredLeSuspend : null).filter(x => x !== null);
     return v.length ? v.reduce((a,x) => a+x, 0) / v.length : null;
   });
-  const overnight = vals[0], evening = vals[3];
-  if (evening == null) return '';
-  const isEveningDominant = overnight != null && evening > overnight + 8;
-  const isEveningRed = evening >= 25;
-  if (!isEveningRed && !isEveningDominant) return '';
-  const diff = overnight != null ? Math.round(evening - overnight) : null;
-  const borderCol = isEveningRed ? '#e74c3c' : '#f39c12';
-  const bgCol     = isEveningRed ? '#fef2f2' : '#fffbeb';
-  const headerCol = isEveningRed ? '#c23616' : '#b27100';
-  const levelWord = isEveningRed ? 'RED ●' : 'AMBER ●';
-  const levelColor= isEveningRed ? '#c23616' : '#b27100';
+  const overnight = vals[0];
+  // Find the highest-constrained non-overnight block
+  const waking = vals.slice(1); // morning, afternoon, evening
+  const maxWakingVal = waking.reduce((mx, v) => (v != null && v > (mx||0)) ? v : mx, null);
+  const maxWakingIdx = maxWakingVal != null ? waking.indexOf(maxWakingVal) + 1 : 3; // offset by 1 (overnight=0)
+  // Also track overall max (all 4 blocks)
+  const maxVal = vals.reduce((mx, v) => (v != null && v > (mx||0)) ? v : mx, null);
+  const maxIdx = vals.indexOf(maxVal);
+  const highestBlock = blocks[maxIdx];
+  const highestVal = vals[maxIdx];
+  // Card fires when any block is ≥15% AND there's an overnight differential
+  const isDominant = overnight != null && maxVal != null && (maxIdx > 0) && maxVal > overnight + 6;
+  const isRed = highestVal != null && highestVal >= 25;
+  if (!isRed && !isDominant) return '';
+  const diff = overnight != null && maxIdx > 0 ? Math.round(highestVal - overnight) : null;
+  const borderCol = isRed ? '#e74c3c' : '#f39c12';
+  const bgCol     = isRed ? '#fef2f2' : '#fffbeb';
+  const headerCol = isRed ? '#c23616' : '#b27100';
+  const levelWord = isRed ? 'RED ●' : 'AMBER ●';
+  const levelColor= isRed ? '#c23616' : '#b27100';
   const chips = blocks.map((b, i) => {
     const v = vals[i];
     const rv = v != null ? Math.round(v) : null;
     const color  = v == null ? '#95a5a6' : v >= 25 ? '#e74c3c' : v >= 15 ? '#f39c12' : '#1abc9c';
     const bg     = v == null ? '#f5f5f5' : v >= 25 ? '#fdecea' : v >= 15 ? '#fffbeb' : '#ecf9f1';
     const border = v == null ? '#ddd'     : v >= 25 ? '#fab1a0' : v >= 15 ? '#f5d086' : '#a3e6c3';
-    const isEve  = i === 3;
-    const ringStyle = isEve ? `border:2px solid ${border};box-shadow:0 0 0 2px ${borderCol}55;` : `border:1px solid ${border};`;
-    return `<div style="padding:8px 10px;border-radius:8px;background:${bg};${ringStyle}text-align:center;min-width:68px;flex:1"><div style="font-size:9px;color:#555;margin-bottom:1px">${esc(b.label)}</div><div style="font-size:9px;color:#888;margin-bottom:4px">${esc(b.sublabel)}</div><div style="font-size:22px;font-weight:700;color:${color}">${rv != null ? rv + '%' : '–'}</div></div>`;
+    const isHighest = i === maxIdx;
+    const ringStyle = isHighest ? `border:2px solid ${border};box-shadow:0 0 0 2px ${borderCol}55;` : `border:1px solid ${border};`;
+    return `<div style="padding:8px 10px;border-radius:8px;background:${bg};${ringStyle}text-align:center;min-width:68px;flex:1"><div style="font-size:9px;color:#555;margin-bottom:1px">${esc(b.label)}</div><div style="font-size:9px;color:#888;margin-bottom:4px">${esc(b.sublabel)}</div><div style="font-size:22px;font-weight:700;color:${color}">${rv != null ? rv + '%' : '–'}</div>${isHighest ? `<div style="font-size:8px;color:${borderCol};margin-top:2px;font-weight:700">▲ highest</div>` : ''}</div>`;
   }).join('');
-  const inversionNote = isEveningDominant && diff != null
-    ? `<div style="font-size:11px;color:#444;margin-top:8px;line-height:1.6">⚠ <strong>Structural inversion:</strong> Evening (18–24h) is the <em>highest-constrained</em> block — ${diff}pp above Overnight (${overnight != null ? Math.round(overnight) : '?'}%), which was the Q5 basal reduction target. The overnight window is actually the <em>least constrained</em>. Constraint may be driven by carb cascade accumulating through the school day into the evening window, or by afternoon/evening basal being too strong independently.</div>`
+  // Inversion note: dynamic block name
+  const inversionNote = isDominant && diff != null
+    ? `<div style="font-size:11px;color:#444;margin-top:8px;line-height:1.6">⚠ <strong>Structural signal:</strong> ${esc(highestBlock.label)} (${esc(highestBlock.sublabel)}) is the <em>highest-constrained</em> block — ${diff}pp above Overnight (${Math.round(overnight)}%), which was the Q5 basal reduction target. The overnight window is actually the <em>least constrained</em>. If ${esc(highestBlock.label.toLowerCase())} constraint persists on behaviorally-quiet days (Fri/Sat), this suggests structural overbasalization in that time block, independent of the after-school cascade.</div>`
     : '';
   return `<div style="border:2px solid ${borderCol};background:${bgCol};border-radius:10px;padding:12px;margin-bottom:12px">
   <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
@@ -1167,7 +1199,7 @@ const eveningBlockCardHtml = (function() {
   </div>
   <div style="display:flex;gap:8px;flex-wrap:wrap">${chips}</div>
   ${inversionNote}
-  <div style="font-size:11px;color:#555;margin-top:8px;padding-top:8px;border-top:1px solid ${borderCol}55">Q5 formal pre/post split must include all 4 blocks — the overnight change's effect on the evening (18–24h) window is unknown. Do not adjust basal based on this pattern alone.</div>
+  <div style="font-size:11px;color:#555;margin-top:8px;padding-top:8px;border-top:1px solid ${borderCol}55">Q5 formal pre/post split must include all 4 blocks. Overnight is the Q5 target window but the waking-hours pattern may require separate evaluation. Do not adjust basal without reviewing the split first.</div>
 </div>`;
 })();
 
@@ -1199,12 +1231,57 @@ const q11ModeCardHtml = (function() {
 </div>`;
 })();
 
+// Module-level 6-hour block Pred≤suspend averages (used by priority card and future sections)
+const blockAvg6h = (() => {
+  const data = Array.isArray(overlayHourly) ? overlayHourly : [];
+  const defs = [
+    { key: 'overnight', hours: [0,1,2,3,4,5] },
+    { key: 'morning',   hours: [6,7,8,9,10,11] },
+    { key: 'afternoon', hours: [12,13,14,15,16,17] },
+    { key: 'evening',   hours: [18,19,20,21,22,23] }
+  ];
+  const r = {};
+  defs.forEach(b => {
+    const vals = b.hours.map(h => data[h] && data[h].pctPredLeSuspend != null ? data[h].pctPredLeSuspend : null).filter(x => x !== null);
+    r[b.key] = vals.length ? vals.reduce((a,x) => a+x, 0) / vals.length : null;
+  });
+  return r;
+})();
+
+// Dynamic week label for priority actions header
+const priorityWeekLabel = (() => {
+  try {
+    const tz = 'America/Chicago';
+    const d = new Date(now.toLocaleString('en-US', {timeZone: tz}));
+    const dow = d.getDay(); // 0=Sun, 1=Mon...6=Sat
+    const daysFromMon = dow === 0 ? 6 : dow - 1;
+    const monday = new Date(d.getTime() - daysFromMon * 24*60*60*1000);
+    const m = String(monday.getMonth()+1).padStart(2,'0');
+    const dd = String(monday.getDate()).padStart(2,'0');
+    return `${m}/${dd}`;
+  } catch { return ''; }
+})();
+
 // --- Priority Actions Card ---
-// Synthesizes the week's P0/P1 actions from Analyst + Researcher (04/27 run).
+// Synthesizes the week's P0/P1 actions from Analyst + Researcher — dynamically updates week label + highest block name.
 const priorityActionsHtml = (function() {
+  // Dynamically identify the highest-constrained block for accurate Q5 detail
+  const blockOrder = ['overnight','morning','afternoon','evening'];
+  const blockLabels = {overnight:'Overnight (00–06)',morning:'Morning (06–12)',afternoon:'Afternoon (12–18)',evening:'Evening (18–24)'};
+  let highestBlockLabel = 'Evening (18–24)'; // default
+  let highestBlockPct = blockAvg6h.evening;
+  blockOrder.forEach(k => {
+    const v = blockAvg6h[k];
+    if (v != null && (highestBlockPct == null || v > highestBlockPct)) {
+      highestBlockPct = v;
+      highestBlockLabel = blockLabels[k];
+    }
+  });
+  const highestPctStr = highestBlockPct != null ? Math.round(highestBlockPct) + '%' : 'elevated';
+  const overnightPct = blockAvg6h.overnight != null ? Math.round(blockAvg6h.overnight) + '%' : '?';
   const actions = [
-    { label: 'Q5 formal pre/post overnight split (P0 — overdue)', detail: 'Run stratified by all four 6-hour blocks, explicitly including 18–24h. The overnight block may have improved but the evening block (now 35%) is the primary unresolved signal. This is the critical path for all other questions.', badge: 'P0', color: '#e74c3c' },
-    { label: 'Q1 behavioral test: log after-school snack + dinner ≥3 school days (Mon–Thu)', detail: 'Success condition: evening Pred≤suspend < 20% on logged days while basal unchanged. Failure (>25% even logged): escalates structural basal hypothesis independent of behavioral cascade.', badge: 'P1', color: '#f39c12' },
+    { label: 'Q5 formal pre/post overnight split (P0 — overdue)', detail: `Run stratified by all four 6-hour blocks, explicitly including 18–24h. The overnight block (${overnightPct}) improved with the 05/03 change, but ${highestBlockLabel} is now the highest-constrained block at ${highestPctStr} — and this structural signal persists even on behaviorally-quiet Fridays. This is the critical path for all other questions.`, badge: 'P0', color: '#e74c3c' },
+    { label: 'Q1 behavioral test: log after-school snack + dinner ≥3 school days (Mon–Thu)', detail: 'Success condition: evening Pred≤suspend < 20% on logged days while basal unchanged. Failure (>25% even logged): escalates structural basal hypothesis. Pattern confirmed 4 consecutive school weeks — start this week.', badge: 'P1', color: '#f39c12' },
     { label: 'Q11 mode switch: defer until Q5 resolved', detail: 'AB → Basal-Only does not overcome the shared Pred≤suspend gate. Revisit after Q5 split and constraint reduction. No action needed now.', badge: 'Defer', color: '#7c3aed' }
   ];
   const items = actions.map(a =>
@@ -1214,10 +1291,178 @@ const priorityActionsHtml = (function() {
     </li>`
   ).join('');
   return `<div class="card" style="border-left:4px solid #0d6efd;margin-bottom:12px">
-    <strong style="font-size:13px">📋 Priority actions — week of 04/28</strong>
+    <strong style="font-size:13px">📋 Priority actions${priorityWeekLabel ? ` — week of ${priorityWeekLabel}` : ''}</strong>
     <ul style="list-style:none;margin:8px 0 0;padding:0">${items}</ul>
     <div class="muted" style="margin-top:6px;font-size:11px">Directional only — no setting changes until Q5 split is complete and reviewed.</div>
   </div>`;
+})();
+
+// --- After-School Cascade Tracker Card ---
+// Fires daily when school-day signals have been detected; shows Q1 trial status prominently.
+const afterSchoolCascadeCardHtml = (function() {
+  try {
+    const tz = 'America/Chicago';
+    const todayName = new Intl.DateTimeFormat('en-US', {timeZone: tz, weekday: 'long'}).format(now);
+    const isSchoolDay = ['Monday','Tuesday','Wednesday','Thursday'].includes(todayName);
+    const nowMs = Date.now();
+    const last24 = nowMs - 24*3600*1000;
+    const pts = latestEntries
+      .map(e => ({mg: e.sgv||e.mgdl||e.mgdL, ms: e.date||(e.dateString? Date.parse(e.dateString): undefined)}))
+      .filter(x => typeof x.mg==='number' && typeof x.ms==='number' && x.ms>=last24)
+      .sort((a,b) => a.ms-b.ms);
+    const carbs = latestTreats
+      .filter(t => typeof t.carbs==='number' && t.carbs>0)
+      .map(t => t.mills||(t.created_at? Date.parse(t.created_at): (t.createdAt? Date.parse(t.createdAt): undefined)))
+      .filter(ms => typeof ms==='number');
+    function carbNear(ms){ return carbs.find(ct => ct >= ms - 15*60000 && ct <= ms + 10*60000); }
+    function ctMinOfDay(ms) {
+      const fmtH = new Intl.DateTimeFormat('en-US', {timeZone: tz, hour: '2-digit', hour12: false});
+      const fmtM = new Intl.DateTimeFormat('en-US', {timeZone: tz, minute: '2-digit'});
+      return parseInt(fmtH.format(new Date(ms)))*60 + parseInt(fmtM.format(new Date(ms)));
+    }
+    function isAfterSchool(ms) { const m = ctMinOfDay(ms); return m >= 15*60 && m <= 17*60+30; }
+    const asPts = pts.filter(p => isAfterSchool(p.ms));
+    const signals = [];
+    for (let i = 0; i < asPts.length; i++) {
+      const s = asPts[i];
+      const win = asPts.filter(p => p.ms > s.ms && p.ms <= s.ms + 60*60000);
+      if (!win.length) break;
+      const rise = Math.max(...win.map(p => p.mg - s.mg));
+      if (rise >= 50 && !carbNear(s.ms)) { signals.push({ms: s.ms, rise: Math.round(rise)}); i += 6; }
+    }
+    const signalToday = signals.length > 0;
+    const loggedWindow = carbs.some(ms => isAfterSchool(ms));
+    const knownStreak = 4; // 04/28, 04/29, 05/01, 05/06 from Analyst run notes
+    const f = new Intl.DateTimeFormat('en-US', {timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false});
+    const signalStr = signals.map(s => `${f.format(new Date(s.ms))} CT · rise ~${s.rise} mg/dL`).join('; ');
+    const sColor = signalToday && !loggedWindow ? '#dc2626' : (loggedWindow ? '#16a34a' : '#92400e');
+    const sBg    = signalToday && !loggedWindow ? '#fef2f2' : (loggedWindow ? '#f0fdf4' : '#fffbeb');
+    const sBdr   = signalToday && !loggedWindow ? '#fca5a5' : (loggedWindow ? '#86efac' : '#fde68a');
+    const sLabel = signalToday && !loggedWindow ? '⚠ Rise detected — no carb entry'
+                 : (loggedWindow ? '✓ Carbs logged in window'
+                 : (isSchoolDay ? 'No signal yet (window: 15:00–17:30)' : 'Non-school day'));
+    return `<div class="card" style="border-left:4px solid #f59e0b;background:#fffdf7;margin-bottom:12px">
+  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+    <strong style="font-size:13px">🎒 After-School Cascade Tracker</strong>
+    <span style="font-size:10px;padding:2px 8px;border-radius:999px;background:#fff7ed;color:#c2410c;font-weight:600">${knownStreak} consec. school weeks · Q1</span>
+    ${isSchoolDay ? '<span style="font-size:10px;padding:2px 8px;border-radius:999px;background:#dbeafe;color:#1d4ed8;font-weight:600">School day</span>' : '<span style="font-size:10px;padding:2px 8px;border-radius:999px;background:#f3f4f6;color:#6b7280">Non-school day</span>'}
+  </div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+    <div style="padding:6px 10px;border-radius:8px;background:${sBg};border:1px solid ${sBdr};font-size:12px;flex:1;min-width:140px">
+      <div style="font-size:10px;color:#555;margin-bottom:2px">Today 15:00–17:30 CT</div>
+      <div style="font-weight:700;color:${sColor}">${sLabel}</div>
+      ${signalStr ? `<div style="font-size:10px;color:#666;margin-top:2px">${esc(signalStr)}</div>` : ''}
+    </div>
+    <div style="padding:6px 10px;border-radius:8px;background:#fff7ed;border:1px solid #fde68a;font-size:12px;flex:1;min-width:140px">
+      <div style="font-size:10px;color:#555;margin-bottom:2px">Q1 logging trial</div>
+      <div style="font-weight:700;color:#b45309">Not confirmed started</div>
+      <div style="font-size:10px;color:#555;margin-top:2px">Log snack + dinner ≥3 school days this week</div>
+    </div>
+  </div>
+  <div style="font-size:11px;color:#444;line-height:1.6">Rise detected in the after-school window on <strong>${knownStreak} consecutive school weeks</strong> (04/28, 04/29, 05/01, 05/06 · 16:26–16:46 CT each time). Unlogged carbs spike glucose forecast → Pred≤suspend gates evening corrections → TAR stays elevated. <strong style="color:#b45309">Q1 trial (P1):</strong> Log after-school snack + dinner ≥3 school days. Success = evening Pred≤suspend &lt;20% on logged days. Failure (&gt;25% even logged) escalates structural basal hypothesis.</div>
+</div>`;
+  } catch { return ''; }
+})();
+
+// --- Correction Effectiveness Trend Card ---
+// Sparkline showing Evening IOB 0.5–1.5 median 2h drop across recent builds.
+// Positive = glucose dropped (good). Negative = glucose rose (BAD — shown in red zone).
+const corrEffectTrendCardHtml = (function() {
+  const series = (corrEffectHist && corrEffectHist.series) ? corrEffectHist.series.slice(-10) : [];
+  if (series.length < 2) return '';
+  const vals = series.map(s => s.medDrop2h);
+  const validVals = vals.filter(v => v != null);
+  if (!validVals.length) return '';
+  const current = vals[vals.length - 1];
+  const prev = vals.length >= 2 ? vals[vals.length - 2] : null;
+  // Build inline SVG sparkline
+  const W = 480, H = 80, padL = 36, padR = 12, padT = 12, padB = 28;
+  const innerW = W - padL - padR;
+  const innerH = H - padT - padB;
+  const minV = Math.min(-10, ...validVals) - 5;
+  const maxV = Math.max(30, ...validVals) + 5;
+  const scaleY = v => padT + innerH - ((v - minV) / (maxV - minV)) * innerH;
+  const zeroY = scaleY(0);
+  const n = series.length;
+  const xs = series.map((_, i) => padL + (n === 1 ? innerW / 2 : (i / (n - 1)) * innerW));
+  // Build filled area under/above zero
+  const linePoints = series.map((s, i) => `${xs[i].toFixed(1)},${(s.medDrop2h != null ? scaleY(s.medDrop2h) : scaleY(0)).toFixed(1)}`);
+  // Good zone fill (above zero)
+  const goodFill = series.map((s, i) => {
+    const y = s.medDrop2h != null ? scaleY(s.medDrop2h) : scaleY(0);
+    const clippedY = Math.min(y, zeroY);
+    return `${xs[i].toFixed(1)},${clippedY.toFixed(1)}`;
+  });
+  // Axis lines
+  const axisBottom = `<line x1="${padL}" x2="${W - padR}" y1="${scaleY(0).toFixed(1)}" y2="${scaleY(0).toFixed(1)}" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="3,2"/>`;
+  // X labels
+  const xLabels = series.map((s, i) => {
+    const x = xs[i];
+    return `<text x="${x.toFixed(1)}" y="${H - 4}" text-anchor="middle" font-size="9" fill="${i === n - 1 ? '#0f172a' : '#94a3b8'}" font-weight="${i === n - 1 ? '700' : '400'}">${esc(s.date)}</text>`;
+  }).join('');
+  // Zero label
+  const zeroLabel = `<text x="${padL - 4}" y="${(scaleY(0) + 4).toFixed(1)}" text-anchor="end" font-size="8" fill="#94a3b8">0</text>`;
+  // Positive reference line (+20 = effective threshold)
+  const y20 = scaleY(20);
+  const ref20 = y20 > padT ? `<line x1="${padL}" x2="${W - padR}" y1="${y20.toFixed(1)}" y2="${y20.toFixed(1)}" stroke="#1abc9c" stroke-width="1" stroke-dasharray="4,3" opacity="0.7"/><text x="${padL - 4}" y="${(y20 + 3).toFixed(1)}" text-anchor="end" font-size="8" fill="#1abc9c">20</text>` : '';
+  // Background red zone (below zero)
+  const redZoneH = Math.max(0, H - padB - zeroY);
+  const redZone = redZoneH > 0 ? `<rect x="${padL}" y="${zeroY.toFixed(1)}" width="${innerW}" height="${redZoneH.toFixed(1)}" fill="#fef2f2" rx="0"/>` : '';
+  // Green zone (above zero, subtle)
+  const greenZoneH = Math.max(0, zeroY - padT);
+  const greenZone = greenZoneH > 0 ? `<rect x="${padL}" y="${padT}" width="${innerW}" height="${greenZoneH.toFixed(1)}" fill="#f0fdf4" rx="0"/>` : '';
+  // Line path
+  const pathD = series.map((s, i) => {
+    const y = s.medDrop2h != null ? scaleY(s.medDrop2h) : null;
+    if (y == null) return null;
+    return `${i === 0 ? 'M' : 'L'} ${xs[i].toFixed(1)} ${y.toFixed(1)}`;
+  }).filter(Boolean).join(' ');
+  const linePath = pathD ? `<path d="${pathD}" fill="none" stroke="#0d6efd" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>` : '';
+  // Dots
+  const dots = series.map((s, i) => {
+    if (s.medDrop2h == null) return '';
+    const y = scaleY(s.medDrop2h);
+    const isBad = s.medDrop2h < 0;
+    const isCurrent = i === n - 1;
+    const fill = isBad ? '#dc2626' : '#0d6efd';
+    const r = isCurrent ? 5 : 3;
+    return `<circle cx="${xs[i].toFixed(1)}" cy="${y.toFixed(1)}" r="${r}" fill="${fill}" stroke="#fff" stroke-width="1.5"/>`;
+  }).join('');
+  // Current value label
+  const currentLabel = current != null ? (() => {
+    const y = scaleY(current);
+    const isUp = current < 0;
+    const sign = isUp ? '↑' : '↓';
+    const color = isUp ? '#dc2626' : '#0d6efd';
+    const labelY = y < padT + 14 ? y + 16 : y - 4;
+    return `<text x="${(xs[n - 1] + 6).toFixed(1)}" y="${labelY.toFixed(1)}" font-size="10" font-weight="700" fill="${color}">${sign}${Math.abs(Math.round(current))}</text>`;
+  })() : '';
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" style="width:100%;max-width:520px;height:auto;display:block" role="img" aria-label="Evening correction effectiveness trend">
+<style>text{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}</style>
+${greenZone}${redZone}${ref20}${axisBottom}${linePath}${dots}${currentLabel}${xLabels}${zeroLabel}
+</svg>`;
+  // Summary chips
+  const currentN = series[n-1] && series[n-1].n;
+  const currentPctIneff = series[n-1] && series[n-1].pctIneff;
+  const trend = (prev != null && current != null) ? (current - prev) : null;
+  const trendArrow = trend == null ? '' : (trend >= 0 ? '↓ improving' : '↑ worsening');
+  const trendColor = trend == null ? '#555' : (trend >= 0 ? '#0b8457' : '#dc2626');
+  const currentChipColor = current == null ? 'muted' : current < 0 ? 'high' : current < 20 ? 'med' : 'low';
+  const currentStr = current == null ? 'n/a' : (current < 0 ? `↑ ${Math.abs(Math.round(current))} mg/dL (rising)` : `↓ ${Math.round(current)} mg/dL`);
+  return `<div class="card" style="border-left:4px solid ${current != null && current < 0 ? '#dc2626' : '#0d6efd'};margin-bottom:12px">
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:6px">
+    <strong style="font-size:13px">📉 Evening Correction Effectiveness Trend</strong>
+    <span style="font-size:11px;color:#555">Evening IOB 0.5–1.5 · Median 2h Δ · last ${series.length} builds</span>
+  </div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+    <span class="reliability-chip ${currentChipColor}"><span>Latest median 2h Δ</span><strong>${esc(currentStr)}</strong></span>
+    <span class="reliability-chip ${currentPctIneff != null && currentPctIneff >= 70 ? 'high' : currentPctIneff != null && currentPctIneff >= 50 ? 'med' : 'muted'}"><span>% ineffective @2h</span><strong>${currentPctIneff != null ? Math.round(currentPctIneff) + '%' : 'n/a'}</strong></span>
+    ${currentN ? `<span class="reliability-chip muted"><span>n (events)</span><strong>${currentN}</strong></span>` : ''}
+    ${trend != null ? `<span style="font-size:11px;font-weight:600;color:${trendColor};align-self:center">${trendColor === '#0b8457' ? '↗' : '↘'} vs prior build: ${trend > 0 ? '+' : ''}${Math.round(trend)} mg/dL</span>` : ''}
+  </div>
+  ${svg}
+  <div style="font-size:10px;color:#666;margin-top:4px">Green zone: Δ &gt;0 (glucose dropped). Red zone: Δ &lt;0 (glucose rose). Dashed line at Δ=+20 mg/dL (effectiveness threshold). ${current != null && current < 0 ? '<strong style="color:#dc2626">⚠ Glucose is now rising despite corrections — constraint/carb confounding suspected (Q1, Q5).</strong>' : ''}</div>
+</div>`;
 })();
 
 // Build stats + input hash
@@ -1351,6 +1596,7 @@ const html = `<!doctype html>
  .today-chip{display:inline-block;margin-right:6px;padding:2px 6px;border-radius:999px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;background:#eef2ff;color:#1d4ed8}
  .today-chip--correction{background:#fef3c7;color:#b45309}
  .today-chip--hypo{background:#fee2e2;color:#b91c1c}
+ .today-chip--missed{background:#fff7ed;color:#c2410c}
  @media(max-width:960px){ .reliability-chips{width:100%} .kpi-meta{width:100%;margin-left:0} }
  @media(max-width:768px){ .scenario-card header{flex-direction:column} .gate-row{justify-content:flex-start} }
 .chip-adv{display:inline-block;margin-left:6px;padding:2px 6px;border-radius:10px;background:#1f6feb;color:#fff;font-size:11px;vertical-align:middle}
@@ -1413,6 +1659,7 @@ ${mostActionableHtml}
 ${streakBannerHtml}
 ${overbasalizationCardHtml}
 ${eveningBlockCardHtml}
+${corrEffectTrendCardHtml}
 ${priorityActionsHtml}
 ${q11ModeCardHtml}
 ${(()=>{ // High-ineffectiveness banner just under Most Actionable
@@ -1455,6 +1702,7 @@ ${(()=>{ // Experiment peek mini-card under Most Actionable
   return `<div class="card" style="border-left:4px solid #0d6efd"><div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap"><h3 style="margin:0">Experiment peek</h3><div class="muted">${esc(xp.context||'Corrections — Midday · IOB<0.5')} (recent vs 7d baseline)</div></div><div class="exp-chips" style="margin-top:8px">${chips}</div></div>`;
 })()}
 ${whatToCheckHtml}
+${afterSchoolCascadeCardHtml}
 ${dawnEffectCardHtml}
 ${isfExperimentNullCardHtml}
 ${eveningProtocolCardHtml}
