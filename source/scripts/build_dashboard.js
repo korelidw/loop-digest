@@ -1281,7 +1281,7 @@ const priorityActionsHtml = (function() {
   const overnightPct = blockAvg6h.overnight != null ? Math.round(blockAvg6h.overnight) + '%' : '?';
   const actions = [
     { label: 'Q5 formal pre/post overnight split (P0 — overdue)', detail: `Run stratified by all four 6-hour blocks, explicitly including 18–24h. The overnight block (${overnightPct}) improved with the 05/03 change, but ${highestBlockLabel} is now the highest-constrained block at ${highestPctStr} — and this structural signal persists even on behaviorally-quiet Fridays. This is the critical path for all other questions.`, badge: 'P0', color: '#e74c3c' },
-    { label: 'Q1 behavioral test: log after-school snack + dinner ≥3 school days (Mon–Thu)', detail: 'Success condition: evening Pred≤suspend < 20% on logged days while basal unchanged. Failure (>25% even logged): escalates structural basal hypothesis. Pattern confirmed 4 consecutive school weeks — start this week.', badge: 'P1', color: '#f39c12' },
+    { label: 'Q1 behavioral test: log + pre-bolus ≥10 min for after-school snack + dinner ≥3 school days', detail: 'Reframed 05/15: logging alone is insufficient — carbs were logged today but large rises still occurred (Researcher H1). New success criterion: log AND bolus ≥10 min before eating. Success = evening Pred≤suspend <20% on pre-bolused days. Failure (>25% even pre-bolused): escalates structural basal hypothesis. Boughton 2019: pre-bolus reduces postprandial excursions ~30% under HCL.', badge: 'P1', color: '#f39c12' },
     { label: 'Q11 mode switch: defer until Q5 resolved', detail: 'AB → Basal-Only does not overcome the shared Pred≤suspend gate. Revisit after Q5 split and constraint reduction. No action needed now.', badge: 'Defer', color: '#7c3aed' }
   ];
   const items = actions.map(a =>
@@ -1359,7 +1359,7 @@ const afterSchoolCascadeCardHtml = (function() {
       <div style="font-size:10px;color:#555;margin-top:2px">Log snack + dinner ≥3 school days this week</div>
     </div>
   </div>
-  <div style="font-size:11px;color:#444;line-height:1.6">Rise detected in the after-school window on <strong>${knownStreak} consecutive school weeks</strong> (04/28, 04/29, 05/01, 05/06 · 16:26–16:46 CT each time). Unlogged carbs spike glucose forecast → Pred≤suspend gates evening corrections → TAR stays elevated. <strong style="color:#b45309">Q1 trial (P1):</strong> Log after-school snack + dinner ≥3 school days. Success = evening Pred≤suspend &lt;20% on logged days. Failure (&gt;25% even logged) escalates structural basal hypothesis.</div>
+  <div style="font-size:11px;color:#444;line-height:1.6">Rise detected in the after-school window on <strong>${knownStreak} consecutive school weeks</strong>. Today (non-school Friday): carbs were logged in the 15:00–17:30 window but rises of 129, 102, and 63 mg/dL still occurred — suggesting <strong>bolus timing</strong>, not logging absence, is the proximal bottleneck. Unlogged or late-bolused carbs spike glucose forecast → Pred≤suspend gates evening corrections → TAR elevated. <strong style="color:#b45309">Q1 trial (P1) — reframed:</strong> Log <em>and pre-bolus ≥10 min before eating</em> for after-school snack + dinner ≥3 school days. Success = evening Pred≤suspend &lt;20% on pre-bolused days. Failure (&gt;25% even pre-bolused): escalates structural basal hypothesis.</div>
 </div>`;
   } catch { return ''; }
 })();
@@ -1462,6 +1462,125 @@ ${greenZone}${redZone}${ref20}${axisBottom}${linePath}${dots}${currentLabel}${xL
   </div>
   ${svg}
   <div style="font-size:10px;color:#666;margin-top:4px">Green zone: Δ &gt;0 (glucose dropped). Red zone: Δ &lt;0 (glucose rose). Dashed line at Δ=+20 mg/dL (effectiveness threshold). ${current != null && current < 0 ? '<strong style="color:#dc2626">⚠ Glucose is now rising despite corrections — constraint/carb confounding suspected (Q1, Q5).</strong>' : ''}</div>
+</div>`;
+})();
+
+// --- Bolus Timing Gap Card ---
+// Surfaces today's Researcher H1 finding: logged carbs but large rises → timing is the bottleneck, not logging absence.
+const bolusTimingGapCardHtml = (function() {
+  // Only show when after-school rise signals are present AND carbs were logged (the new signal pattern)
+  try {
+    const tz = 'America/Chicago';
+    const nowMs = Date.now();
+    const last48 = nowMs - 48*3600*1000;
+    // Check if carbs were logged in the last 24h after-school window
+    const carbs = latestTreats
+      .filter(t => typeof t.carbs === 'number' && t.carbs > 0)
+      .map(t => t.mills||(t.created_at? Date.parse(t.created_at): (t.createdAt? Date.parse(t.createdAt): undefined)))
+      .filter(ms => typeof ms === 'number' && ms >= last48);
+    function ctMinOfDay(ms) {
+      const fmtH = new Intl.DateTimeFormat('en-US', {timeZone: tz, hour: '2-digit', hour12: false});
+      const fmtM = new Intl.DateTimeFormat('en-US', {timeZone: tz, minute: '2-digit'});
+      return parseInt(fmtH.format(new Date(ms)))*60 + parseInt(fmtM.format(new Date(ms)));
+    }
+    const hasLoggedAfterSchool = carbs.some(ms => { const m = ctMinOfDay(ms); return m >= 15*60 && m <= 17*60+30; });
+    // Get any rise signals from after-school window in last 24h
+    const pts = latestEntries
+      .map(e => ({mg: e.sgv||e.mgdl||e.mgdL, ms: e.date||(e.dateString? Date.parse(e.dateString): undefined)}))
+      .filter(x => typeof x.mg === 'number' && typeof x.ms === 'number' && x.ms >= nowMs - 24*3600*1000)
+      .sort((a,b) => a.ms-b.ms);
+    function isAfterSchool(ms) { const m = ctMinOfDay(ms); return m >= 15*60 && m <= 17*60+30; }
+    const asPts = pts.filter(p => isAfterSchool(p.ms));
+    let hasRise = false;
+    for (let i = 0; i < asPts.length; i++) {
+      const s = asPts[i];
+      const win = asPts.filter(p => p.ms > s.ms && p.ms <= s.ms + 60*60000);
+      if (!win.length) break;
+      const rise = Math.max(...win.map(p => p.mg - s.mg));
+      if (rise >= 50) { hasRise = true; break; }
+    }
+    // Show card when carbs were logged but rises still detected (the new diagnostic pattern)
+    if (!hasLoggedAfterSchool && !hasRise) return '';
+    return `<div class="card" style="border-left:4px solid #f59e0b;background:#fffbeb;margin-bottom:12px">
+  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+    <strong style="font-size:13px;color:#b45309">⏱ Bolus Timing Gap — New Signal (05/15)</strong>
+    <span style="font-size:10px;padding:2px 8px;border-radius:999px;background:#fff7ed;color:#c2410c;font-weight:600">Researcher H1 · 05/15</span>
+  </div>
+  <div style="font-size:12px;color:#444;line-height:1.6;margin-bottom:8px">
+    <strong>Today: carbs were logged in the after-school window, but large glucose rises still occurred</strong> (16:33, 16:48, 17:08 CT — rises of 129, 102, 63 mg/dL). This is the strongest signal yet that <em>logging presence alone does not resolve the constraint cascade.</em>
+  </div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+    <div style="padding:8px 10px;border-radius:8px;background:#fef2f2;border:1px solid #fca5a5;font-size:11px;flex:1;min-width:160px">
+      <div style="font-size:10px;color:#555;margin-bottom:2px">What changed</div>
+      <div style="font-weight:700;color:#dc2626">Logging ≠ pre-bolused</div>
+      <div style="font-size:10px;color:#555;margin-top:2px">Carb entry made at or after eating → unchecked rise → IOB stack → Pred≤suspend cascade</div>
+    </div>
+    <div style="padding:8px 10px;border-radius:8px;background:#f0fdf4;border:1px solid #86efac;font-size:11px;flex:1;min-width:160px">
+      <div style="font-size:10px;color:#555;margin-bottom:2px">Q1 reframe (P1)</div>
+      <div style="font-weight:700;color:#16a34a">Log + pre-bolus ≥10 min</div>
+      <div style="font-size:10px;color:#555;margin-top:2px">When food is prepared (not just before eating), not after. ~30% excursion reduction under HCL (Boughton 2019)</div>
+    </div>
+  </div>
+  <div style="font-size:11px;color:#555;line-height:1.5;border-top:1px solid #f59e0b44;padding-top:8px;margin-top:4px">
+    <strong>Mechanism:</strong> Late bolus → unchecked 20–30 min glucose rise (subcutaneous delay) → AID reactive correction → IOB stacking → Pred≤suspend cascade → TAR stays elevated. Under Loop's conservative Pred≤suspend gate, the timing penalty may be amplified vs faster-acting HCL systems (Boughton 2019 used CamAPS FX).<br>
+    <strong>Safety note:</strong> Pre-bolusing too early carries hypo risk if child delays eating. Bolus when food is prepared/poured, not before. Have a fast-carb contingency.
+  </div>
+</div>`;
+  } catch { return ''; }
+})();
+
+// --- Investigation Gate Status Card ---
+// Synthesizes the 3 blocked prerequisites as a compact progress panel (Researcher H2 · 05/15).
+const investigationGateCardHtml = (function() {
+  const gates = [
+    {
+      id: 'Q5',
+      label: 'Q5 pre/post overnight split',
+      detail: 'Formal analysis: did the 05/03 basal change improve all 4 six-hour blocks? Single gate for all basal conclusions.',
+      status: 'overdue',
+      daysStr: '3+ weeks overdue',
+      color: '#dc2626',
+      bg: '#fef2f2',
+      bdr: '#fca5a5'
+    },
+    {
+      id: 'Q1',
+      label: 'Q1 pre-bolus trial',
+      detail: 'Log + pre-bolus ≥10 min for after-school snack + dinner on ≥3 school days. Prerequisite: must run before Q10 clean-trial evaluation.',
+      status: 'not started',
+      daysStr: 'Not confirmed started (due 05/11)',
+      color: '#d97706',
+      bg: '#fffbeb',
+      bdr: '#fde68a'
+    },
+    {
+      id: 'Q10',
+      label: 'Q10 evening clean trials',
+      detail: 'IOB 0.5–1.5, no food ±2h, Pred≤suspend NOT active. 0 of 3 trials completed in 25 days since protocol published.',
+      status: '0 of 3 trials',
+      daysStr: '25 days since protocol (04/20)',
+      color: '#d97706',
+      bg: '#fffbeb',
+      bdr: '#fde68a'
+    }
+  ];
+  const gateHtml = gates.map(g => `
+    <div style="flex:1;min-width:200px;padding:10px;border-radius:8px;background:${g.bg};border:1px solid ${g.bdr}">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+        <span style="font-size:11px;font-weight:700;color:${g.color};background:${g.color}22;padding:1px 6px;border-radius:999px">${esc(g.id)}</span>
+        <span style="font-size:12px;font-weight:600;color:#111">${esc(g.label)}</span>
+      </div>
+      <div style="font-size:10px;color:${g.color};font-weight:600;margin-bottom:4px">${esc(g.daysStr)}</div>
+      <div style="font-size:10px;color:#555;line-height:1.4">${esc(g.detail)}</div>
+    </div>`).join('');
+  return `<div class="card" style="border-left:4px solid #dc2626;background:#fafafa;margin-bottom:12px">
+  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+    <strong style="font-size:13px;color:#dc2626">🚧 Investigation Gates — 3 Prerequisites Blocked</strong>
+    <span style="font-size:10px;padding:2px 8px;border-radius:999px;background:#fee2e2;color:#b91c1c;font-weight:600">All 3 unmet</span>
+  </div>
+  <div style="font-size:11px;color:#555;margin-bottom:10px;line-height:1.5">Analytical pipeline has reached a <strong>measurement plateau</strong>. Additional runs produce diminishing returns until at least one prerequisite advances. Each blocked gate prevents falsifying a hypothesis (Researcher H2 · 05/15).</div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">${gateHtml}</div>
+  <div style="font-size:10px;color:#888;margin-top:8px;border-top:1px solid #e5e7eb;padding-top:6px">Priority order: Q5 first (single gate for basal conclusions) → Q1 next (prerequisite for Q10) → Q10 last (ISF falsification). No ISF or basal changes until at least Q5 is reviewed.</div>
 </div>`;
 })();
 
@@ -1661,6 +1780,7 @@ ${overbasalizationCardHtml}
 ${eveningBlockCardHtml}
 ${corrEffectTrendCardHtml}
 ${priorityActionsHtml}
+${investigationGateCardHtml}
 ${q11ModeCardHtml}
 ${(()=>{ // High-ineffectiveness banner just under Most Actionable
   try{
@@ -1703,6 +1823,7 @@ ${(()=>{ // Experiment peek mini-card under Most Actionable
 })()}
 ${whatToCheckHtml}
 ${afterSchoolCascadeCardHtml}
+${bolusTimingGapCardHtml}
 ${dawnEffectCardHtml}
 ${isfExperimentNullCardHtml}
 ${eveningProtocolCardHtml}
